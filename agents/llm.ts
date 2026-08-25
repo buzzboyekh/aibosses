@@ -20,6 +20,18 @@ export async function callLlm(
   systemPrompt: string,
   contextBlock: string
 ): Promise<LlmDraft> {
+  const system = `${systemPrompt}\n\n${SHAPE}`;
+  // Whichever key is present wins; LLM_PROVIDER forces one. Anthropic is
+  // checked first only because OpenAI event credits do not exist until Sep 4.
+  const provider =
+    process.env.LLM_PROVIDER ??
+    (process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai");
+  return provider === "anthropic"
+    ? callAnthropic(system, contextBlock)
+    : callOpenAi(system, contextBlock);
+}
+
+async function callOpenAi(system: string, user: string): Promise<LlmDraft> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error("OPENAI_API_KEY missing");
   const model = process.env.LLM_MODEL ?? "gpt-4o-mini";
@@ -32,16 +44,44 @@ export async function callLlm(
       response_format: { type: "json_object" },
       temperature: 0.2,
       messages: [
-        { role: "system", content: `${systemPrompt}\n\n${SHAPE}` },
-        { role: "user", content: contextBlock },
+        { role: "system", content: system },
+        { role: "user", content: user },
       ],
     }),
   });
 
-  if (!res.ok) throw new Error(`LLM ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const json = await res.json();
   const raw = json.choices?.[0]?.message?.content;
-  if (!raw) throw new Error("LLM returned no content");
+  if (!raw) throw new Error("OpenAI returned no content");
+  return parseDraft(raw);
+}
+
+async function callAnthropic(system: string, user: string): Promise<LlmDraft> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) throw new Error("ANTHROPIC_API_KEY missing");
+  const model = process.env.LLM_MODEL ?? "claude-sonnet-4-5";
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": key,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1500,
+      temperature: 0.2,
+      system,
+      messages: [{ role: "user", content: user }],
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  const json = await res.json();
+  const raw = json.content?.[0]?.text;
+  if (!raw) throw new Error("Anthropic returned no content");
   return parseDraft(raw);
 }
 
