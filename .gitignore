@@ -4,3 +4,4 @@ node_modules/
 .next/
 test/decide.mjs
 .DS_Store
+test/line-verify.mjs

@@ -18,3 +18,15 @@ sed -e 's|^import { SupabaseClient } from "@supabase/supabase-js";||' \
 > test/decide.mjs
 
 node --input-type=module -e "await import('./test/decide.mjs')" && echo "built test/decide.mjs"
+
+# LINE verify module (same trick, for test/line.test.mjs)
+python3 - <<'PY'
+src = open('line/verify.ts').read()
+src = src.replace('rawBody: string,', 'rawBody,')
+src = src.replace('signature: string | null | undefined,', 'signature,')
+src = src.replace('channelSecret: string\n): boolean {', 'channelSecret\n) {')
+src = src.replace('action: "approve" | "reject", approvalId: string): string {', 'action, approvalId) {')
+src = src.replace('  data: string\n): { action: "approve" | "reject"; approvalId: string } | null {', '  data\n) {')
+open('test/line-verify.mjs','w').write(src)
+PY
+echo "built test/line-verify.mjs"
