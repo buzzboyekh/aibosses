@@ -11,10 +11,22 @@ export type ApprovalState =
   | "auto_executed";
 
 export type ActionType =
-  | "send_quote"          // reply to a customer inquiry with a quote
-  | "send_po"             // purchase order to a supplier
-  | "send_customer_email" // any outbound customer message
-  | "flag_doc_mismatch";  // doc check found a problem, drafts the notice
+  // Outbound Communication
+  | "send_quote"           // reply to a customer inquiry with a quote
+  | "send_customer_email"  // any other outbound customer message
+  // Sourcing & Negotiation
+  | "send_rfq"             // ask suppliers to quote
+  | "send_po"              // purchase order to a supplier
+  // Document Intelligence
+  | "flag_doc_mismatch"    // documents disagree; drafts the notice
+  | "suggest_hs_code"      // suggestion only, never a duty amount
+  // Monitoring & Exceptions
+  | "send_status_update"   // proactive update before the customer asks
+  | "propose_reroute"      // a lane is broken; propose an alternative
+  // Relationship Memory
+  | "flag_supplier_risk"   // a counterparty is behaving badly
+  // Orchestration
+  | "escalate_to_owner";   // does not fit any capability; a human decides
 
 export type DocType =
   | "rfq"

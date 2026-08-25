@@ -19,13 +19,17 @@ export interface BusinessConfig {
   roles: RoleConfig[];
 }
 
+// The roles here mirror db/seed.sql, which is generated from the live
+// database. Named by capability, not job title, so the same roster ports to
+// another industry by changing only the facts it is pointed at
+// (see docs/AGENT_ROSTER.md).
 export const importExportConfig: BusinessConfig = {
   key: "demo-import",
   name: "Demo Import Trading Co. 示範貿易",
   roles: [
     {
       key: "sales_quote",
-      name: "Sales & Quoting Agent",
+      name: "Outbound Communication",
       action_types: ["send_quote", "send_customer_email"],
       context_tags: ["pricing", "incoterms", "tone"],
       promote_threshold: 3,
@@ -44,7 +48,7 @@ export const importExportConfig: BusinessConfig = {
     },
     {
       key: "doc_check",
-      name: "Document Check Agent",
+      name: "Document Intelligence",
       action_types: ["flag_doc_mismatch"],
       context_tags: ["docs", "suppliers"],
       promote_threshold: 3,
@@ -63,7 +67,7 @@ export const importExportConfig: BusinessConfig = {
     },
     {
       key: "ops_po",
-      name: "Purchasing Agent",
+      name: "Sourcing & Negotiation",
       action_types: ["send_po"],
       context_tags: ["suppliers", "incoterms", "pricing"],
       promote_threshold: 3,
