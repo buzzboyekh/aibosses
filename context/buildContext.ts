@@ -54,12 +54,17 @@ export async function buildContext(
     .order("created_at", { ascending: false })
     .limit(RECENT_DOCS);
 
+  // The queries above select a subset of columns, so these rows are NOT full
+  // ContextNote / DocumentRecord objects. Type them as what was actually asked for.
+  type NoteRow = Pick<ContextNote, "tags" | "content">;
+  type DocRow = Pick<DocumentRecord, "id" | "doc_type" | "extracted">;
+
   const snapshot: ContextSnapshot = {
     role_key: role.key,
     business_key: business.key,
     task,
-    notes: (notes ?? []).map((n: ContextNote) => ({ tags: n.tags, content: n.content })),
-    documents: (docs ?? []).map((d: DocumentRecord) => ({
+    notes: (notes ?? []).map((n: NoteRow) => ({ tags: n.tags, content: n.content })),
+    documents: (docs ?? []).map((d: DocRow) => ({
       id: d.id, doc_type: d.doc_type, extracted: d.extracted,
     })),
     assembled_at: new Date().toISOString(),
