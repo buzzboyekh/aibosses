@@ -9,3 +9,4 @@ test/line-verify.mjs
 next-env.d.ts
 *.tsbuildinfo
 .env*
+test/llm-parse.mjs

@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
           }
           await handlePostback(db, ownerUserId ?? event.source.userId, event.postback.data);
         } else if (event.type === "message" && event.message?.type === "text") {
-          await handleText(event.source?.userId, event.message.text, ownerUserId);
+          await handleText(db, event.source?.userId, event.message.text, ownerUserId);
         }
       } catch (err) {
         console.error("[line] event handler failed", err);

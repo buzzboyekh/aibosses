@@ -30,3 +30,15 @@ src = src.replace('  data: string\n): { action: "approve" | "reject"; approvalId
 open('test/line-verify.mjs','w').write(src)
 PY
 echo "built test/line-verify.mjs"
+
+# LLM parser (for test/llm.test.mjs)
+python3 - <<'PY'
+import re
+src = open('agents/llm.ts').read()
+src = src[src.index('export function parseDraft'):]
+src = src.replace('export function parseDraft(raw: string): LlmDraft {', 'export function parseDraft(raw) {')
+src = re.sub(r'\(m\):\s*m is string\s*=>', '(m) =>', src)
+src = re.sub(r'^\s*let obj: Record<string, unknown>;', '  let obj;', src, flags=re.M)
+open('test/llm-parse.mjs','w').write(src)
+PY
+echo "built test/llm-parse.mjs"

@@ -68,6 +68,7 @@ export async function notifyOwner(
  * LINE never tells you it up front, you read it off the first message.
  */
 export async function handleText(
+  db: SupabaseClient,
   userId: string,
   message: string,
   ownerUserId: string | null
@@ -79,7 +80,24 @@ export async function handleText(
     ]);
     return;
   }
-  if (userId === ownerUserId && message.trim().toLowerCase() === "ping") {
-    await pushMessage(userId, [text("pong — webhook is live")]);
+  if (userId === ownerUserId) {
+    if (message.trim().toLowerCase() === "ping") {
+      await pushMessage(userId, [text("pong — webhook is live")]);
+    }
+    return; // the owner approves, he does not generate work for himself
+  }
+
+  // Anyone who is not the owner is a customer. Their message is an inquiry:
+  // the quoting agent drafts a reply, and it goes to the owner for approval.
+  // The customer gets an acknowledgement, never the draft itself.
+  await pushMessage(userId, [text("Thanks, we are preparing a quote for you.")]);
+  try {
+    const { runAgentForInquiry } = await import("./inquiry");
+    await runAgentForInquiry(db, userId, message, ownerUserId);
+  } catch (err) {
+    console.error("[line] inquiry agent failed", err);
+    await pushMessage(ownerUserId, [
+      text(`An inquiry came in but the agent failed:\n${String(err).slice(0, 200)}`),
+    ]);
   }
 }

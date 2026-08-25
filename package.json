@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "./test/build-mjs.sh >/dev/null && node test/decide.test.mjs && node test/line.test.mjs"
+    "test": "./test/build-mjs.sh >/dev/null && node test/decide.test.mjs && node test/line.test.mjs && node test/llm.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",
