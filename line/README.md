@@ -54,3 +54,17 @@ Paste that into the env and redeploy. Only that user's taps are accepted.
 - [ ] Auto-reply messages OFF (they fight the bot's own replies)
 - [ ] Add the OA as a friend, send "hi", copy the returned user id into env
 - [ ] Send "ping" → expect "pong — webhook is live"
+
+## Serverless trap (cost us a debugging round, 2026-08-25)
+
+On Vercel the function is **frozen the moment the response returns**. A bare
+fire-and-forget promise never runs: the webhook logs a clean 200, and the
+approval sits pending forever with no error anywhere.
+
+The route hands background work to `waitUntil()` from `@vercel/functions`
+instead, which keeps the instance alive until the work settles while the 200
+still goes out immediately. Outside Vercel `waitUntil` is unavailable, so the
+route falls back to awaiting.
+
+If approvals ever stop applying, check this first: a 200 with no handler log
+lines after it is the tell.

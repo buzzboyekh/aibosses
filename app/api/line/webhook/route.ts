@@ -3,9 +3,14 @@
 // Three rules this file exists to enforce:
 //  1. Verify the signature over the RAW body, before parsing.
 //  2. Return 200 immediately. LINE retries non-200, which double-processes.
-//  3. Do the slow work (LLM, DB) after the response, never inside it.
+//  3. Do the slow work (LLM, DB) after the response, never inside it — but
+//     hand it to waitUntil(), NOT a bare fire-and-forget promise. On Vercel
+//     the function is frozen the moment the response is returned, so a
+//     detached promise silently never runs. This cost us a debugging round:
+//     the webhook logged a 200 and the approval stayed pending forever.
 
 import { NextRequest, NextResponse } from "next/server";
+import { waitUntil } from "@vercel/functions";
 import { serverDb } from "../../../../context/buildContext";
 import { handlePostback, handleText } from "../../../../line/handlers";
 import { verifyLineSignature } from "../../../../line/verify";
@@ -32,8 +37,7 @@ export async function POST(req: NextRequest) {
   const events = body.events ?? [];
   const ownerUserId = process.env.LINE_OWNER_USER_ID ?? null;
 
-  // Fire and forget: the response must not wait on agent work.
-  void (async () => {
+  const work = (async () => {
     const db = serverDb();
     for (const event of events) {
       try {
@@ -51,6 +55,14 @@ export async function POST(req: NextRequest) {
       }
     }
   })();
+
+  // waitUntil keeps the instance alive until `work` settles while the 200 goes
+  // out immediately. Outside Vercel it is unavailable, so fall back to await.
+  try {
+    waitUntil(work);
+  } catch {
+    await work;
+  }
 
   return NextResponse.json({ ok: true });
 }
