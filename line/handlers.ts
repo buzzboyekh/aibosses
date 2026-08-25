@@ -59,8 +59,25 @@ export async function notifyOwner(
     body: string;
     reason: string;
   }
-): Promise<void> {
-  await pushMessage(ownerUserId, [approvalCard(args)]);
+): Promise<{ ok: boolean; status: number }> {
+  return pushMessage(ownerUserId, [approvalCard(args)]);
+}
+
+/**
+ * A Level-1 role acts without asking. The owner is still told, after the fact,
+ * or an auto-executed action would be invisible until someone opened the
+ * dashboard.
+ */
+export async function notifyOwnerAutoExecuted(
+  ownerUserId: string,
+  args: { roleName: string; title: string; body: string }
+): Promise<{ ok: boolean; status: number }> {
+  return pushMessage(ownerUserId, [
+    text(
+      "Sent automatically by " + args.roleName + " (Level 1):\n\n" +
+      args.title + "\n\n" + args.body.slice(0, 300)
+    ),
+  ]);
 }
 
 /**

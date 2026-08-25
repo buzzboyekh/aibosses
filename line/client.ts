@@ -12,7 +12,10 @@ function token(): string {
   return t;
 }
 
-export async function pushMessage(to: string, messages: unknown[]): Promise<void> {
+export async function pushMessage(
+  to: string,
+  messages: unknown[]
+): Promise<{ ok: boolean; status: number }> {
   const res = await fetch(`${LINE_API}/message/push`, {
     method: "POST",
     headers: {
@@ -26,6 +29,10 @@ export async function pushMessage(to: string, messages: unknown[]): Promise<void
     // notification must never make us return non-200 and trigger LINE retries.
     console.error("[line] push failed", res.status, await res.text());
   }
+  // Returned, not thrown: a failed notification must not make the webhook
+  // return non-200 (LINE retries and double-processes). But the caller must be
+  // able to tell that the owner's phone never actually got it.
+  return { ok: res.ok, status: res.status };
 }
 
 export async function replyMessage(replyToken: string, messages: unknown[]): Promise<void> {

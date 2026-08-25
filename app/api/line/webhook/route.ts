@@ -35,18 +35,24 @@ export async function POST(req: NextRequest) {
   }
 
   const events = body.events ?? [];
-  const ownerUserId = process.env.LINE_OWNER_USER_ID ?? null;
+  // Fail closed. With this unset, the old code treated every sender as the
+  // owner and even replied to strangers with the id needed to take over.
+  const ownerUserId = process.env.LINE_OWNER_USER_ID;
+  if (!ownerUserId) {
+    console.error("[line] LINE_OWNER_USER_ID unset — refusing to process events");
+    return NextResponse.json({ ok: true });
+  }
 
   const work = (async () => {
     const db = serverDb();
     for (const event of events) {
       try {
         if (event.type === "postback" && event.postback?.data) {
-          if (ownerUserId && event.source?.userId !== ownerUserId) {
+          if (event.source?.userId !== ownerUserId) {
             console.warn("[line] postback from non-owner, ignored");
             continue; // only the operator may approve
           }
-          await handlePostback(db, ownerUserId ?? event.source.userId, event.postback.data);
+          await handlePostback(db, ownerUserId, event.postback.data);
         } else if (event.type === "message" && event.message?.type === "text") {
           await handleText(db, event.source?.userId, event.message.text, ownerUserId);
         }

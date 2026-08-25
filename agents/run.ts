@@ -7,7 +7,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { buildContext } from "../context/buildContext";
 import { draftApproval } from "../context/decide";
-import { notifyOwner } from "../line/handlers";
+import { notifyOwner, notifyOwnerAutoExecuted } from "../line/handlers";
 import type { ActionType } from "../context/types";
 import { callLlm } from "./llm";
 
@@ -50,14 +50,25 @@ export async function runAgent(
     reason,
   });
 
-  if (!autoExecuted && args.notifyUserId) {
-    await notifyOwner(args.notifyUserId, {
-      approvalId: approval.id,
-      roleName: ctx.role.name,
-      title: draft.title,
-      body: draft.body,
-      reason,
-    });
+  if (args.notifyUserId) {
+    if (autoExecuted) {
+      // A promoted role acts without asking, but the owner must still SEE it.
+      // Previously this path sent nothing at all, so an auto-executed action
+      // was invisible until someone happened to open the dashboard.
+      await notifyOwnerAutoExecuted(args.notifyUserId, {
+        roleName: ctx.role.name,
+        title: draft.title,
+        body: draft.body,
+      });
+    } else {
+      await notifyOwner(args.notifyUserId, {
+        approvalId: approval.id,
+        roleName: ctx.role.name,
+        title: draft.title,
+        body: draft.body,
+        reason,
+      });
+    }
   }
 
   return { approvalId: approval.id, title: draft.title, autoExecuted };

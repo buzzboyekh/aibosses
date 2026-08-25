@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "demo:reset": "node --env-file=.env.local scripts/demo-reset.mjs",
     "test": "./test/build-mjs.sh >/dev/null && node test/decide.test.mjs && node test/line.test.mjs && node test/llm.test.mjs"
   },
   "dependencies": {
