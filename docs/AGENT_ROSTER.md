@@ -32,17 +32,45 @@ else.
 
 ## The roster
 
-Three of these already exist and are live (`sales_quote`, `doc_check`,
-`ops_po`); two are new; the boss is new.
+Named by **capability, not job title.** Team decision, 2026-08-25.
 
-| # | key | name | Blueprint name | may draft | may see |
+A job title locks an agent to one industry: "Customs Officer" is useless to a
+school. A capability travels: *reading documents and cross-checking them* is
+customs paperwork in freight, contracts in a law office, and marked homework in
+a classroom. Same agent, different config.
+
+It also changes what the pitch sounds like. Five job titles imply we are
+replacing five employees, which invites the objection we least want. Five
+capabilities sound like infrastructure.
+
+Three of these are already live (`doc_check`, `ops_po`, `sales_quote`); the keys
+stay as they are because deployed code and Eric's in-flight work reference them.
+The **name** is what the dashboard and the pitch use.
+
+| # | key | name (capability) | what it does | in logistics | may draft |
 |---|---|---|---|---|---|
-| 0 | `boss` | The Boss | Chief Executive Agent | `escalate_to_owner` | `routing` |
-| 1 | `doc_check` | Customs & Documents | GCO | `flag_doc_mismatch`, `suggest_hs_code` | `docs`, `customs`, `suppliers` |
-| 2 | `ops_po` | Procurement & Carriers | PNE | `send_rfq`, `send_po` | `suppliers`, `pricing`, `incoterms` |
-| 3 | `dispatch` | Dispatch & Tracking | MDO | `send_status_update`, `propose_reroute` | `routes`, `schedules` |
-| 4 | `sales_quote` | Client Experience | CXE | `send_quote`, `send_customer_email` | `pricing`, `incoterms`, `tone` |
-| 5 | `supplier_trust` | Supplier Trust | SRM | `flag_supplier_risk` | `suppliers`, `history` |
+| 0 | `orchestrator` | **Orchestration** | routes work to the right capability, escalates what does not fit | assigns an inbound shipment task | `escalate_to_owner` |
+| 1 | `doc_check` | **Document Intelligence** | reads documents, extracts fields, cross-checks them against each other | invoice vs packing list vs customs entry | `flag_doc_mismatch`, `suggest_hs_code` |
+| 2 | `ops_po` | **Sourcing & Negotiation** | finds options, compares them on real criteria, drafts the ask | carrier rates, supplier quotes, POs | `send_rfq`, `send_po` |
+| 3 | `monitoring` | **Monitoring & Exceptions** | watches state, notices deviation, proposes the fix before anyone asks | port delay, ETA slip, reroute | `send_status_update`, `propose_reroute` |
+| 4 | `sales_quote` | **Outbound Communication** | drafts anything that leaves the building, in the right language and tone | quotes, delay notices, customer replies | `send_quote`, `send_customer_email` |
+| 5 | `relationship_memory` | **Relationship Memory** | remembers how every counterparty behaves and holds us to it | supplier reliability, customer history | `flag_supplier_risk` |
+
+### Why this is the platform proof
+
+The same six capabilities, pointed at a different business by config alone:
+
+| capability | freight forwarder | debate academy | barbershop |
+|---|---|---|---|
+| Document Intelligence | invoice vs packing list | marked essays against a rubric | supplier invoices |
+| Sourcing & Negotiation | carrier rates | venue and printing quotes | product wholesale |
+| Monitoring & Exceptions | ETA slipped | a student stopped attending | a no-show booking |
+| Outbound Communication | delay notice to a customer | progress note to a parent | appointment reminder |
+| Relationship Memory | which supplier ships late | which student needs pushing | which client tips |
+| Orchestration | routes the shipment | routes the class admin | routes the day |
+
+That table is the roadmap slide, and it is why the second-config cameo lands:
+nothing in the roster is logistics-specific except the config we point it at.
 
 ### Deliberate exclusions, do not add these back
 
@@ -95,6 +123,7 @@ Rendering that live is a frontend job, not a backend one.
 ## Suggested build order for the skeleton
 
 1. Write the six rows into `db/seed.sql`, following the three that are there.
+   Keep existing keys; set the new capability `name` on all six.
 2. Add the new action types to `ActionType` in `context/types.ts`.
 3. Add `context_notes` rows for the new tags (`routes`, `schedules`,
    `customs`, `history`) so the new agents have facts to stand on.
