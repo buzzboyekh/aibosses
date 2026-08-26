@@ -77,6 +77,7 @@ export interface DecisionLogEntry {
   business_id: string;
   actor: string; // 'agent:<roleKey>' | 'owner' | 'system'
   action:
+    | "routed"
     | "drafted"
     | "approved"
     | "rejected"
