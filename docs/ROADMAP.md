@@ -38,6 +38,60 @@ Live at https://aibosses.vercel.app, 32 tests passing.
 Missing: the document upload page (Eric), the live activity stream (Tim), a
 second business config, the pitch, and the fallback video.
 
+## Who does what, and why them
+
+Allocated to each person's actual advantage, not split evenly by line count.
+
+### Eric — because he is there on Saturday
+
+The only one present for all three days, including the one full build day
+Kun misses. That is a structural advantage, so his work is the work that has
+to happen on site.
+
+- **`/documents`**: upload → extract → cross-check → approval card. The demo's
+  second act, end to end.
+- **Demo operator.** Owns the demo machine, drives `npm run demo` on stage
+  while Kun talks. Must be able to run it alone, unprompted, by Sep 1.
+- **On-site setup**: screen mirroring tested, two phones on 4G, fallback video
+  cued and ready to play.
+- **Saturday integration**: whatever needs fixing, he is the one who can fix it
+  in the room.
+
+He builds automations at work, so the upload-extract-store loop is squarely in
+what he already does. And making his attendance the asset means the day Kun is
+away is a strength rather than a hole.
+
+### Tim — because he thinks in systems
+
+He wrote the company blueprint unprompted. That is the skill to use, and these
+tasks fit around a day job better than a build sprint does.
+
+- **Merge PR #1.** Repo is his; unblocks everyone.
+- **Live activity stream.** His own idea, and the screen the judges look at.
+  `decision_log` already holds the data.
+- **Second business config.** Same six capabilities pointed at a different
+  industry. Conceptual work, little code, and it is what turns the platform
+  claim into evidence.
+- **The slide deck.** The vision framing, the org chart, the roadmap. He
+  writes these well; Kun should not be writing slides the week he is pitching.
+
+### Kun — because only he can do these
+
+- **The pitch and the Q&A.** He is a debate coach. This is the highest-scoring
+  thing left and nobody can hand it over.
+- **Fallback video**, before SEMICON. He is the only voice that can narrate it.
+- **Real data.** The sourcing numbers are his, and "we ran our real RFQs
+  through this" is a sentence only he can say honestly.
+- **Product calls**: what gets cut, which bounty is worth an hour, what goes
+  on the slide.
+
+### Deliberately not Kun
+
+Everything he has been carrying that someone else can hold: the dashboard,
+the activity stream, the deck, the on-site setup. He is absent for Build Day
+and pitching on demo day, so anything only he understands is a single point of
+failure. Handing work over now is a schedule requirement, not generosity.
+
 ## Phase 1 — finish and freeze (now → Sun Aug 31)
 
 Everything the demo depends on lands this week. Nothing after this is
