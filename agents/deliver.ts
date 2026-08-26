@@ -10,11 +10,14 @@
 
 import { SupabaseClient } from "@supabase/supabase-js";
 import { pushMessage } from "../line/client";
+import { sendEmail, subjectFor } from "./email";
 
 export interface Recipient {
-  channel: "line" | "none";
-  user_id?: string;
-  label?: string; // what to call them in the log
+  channel: "line" | "email" | "none";
+  user_id?: string;   // LINE
+  email?: string;     // email
+  label?: string;     // what to call them in the log
+  reference?: string; // shipment or order ref, for the subject line
 }
 
 export interface DeliveryResult {
@@ -37,7 +40,8 @@ export async function deliver(
   const to = payload.deliver_to;
   const body = payload.body ?? approval.title;
 
-  if (!to || to.channel === "none" || !to.user_id) {
+  const hasTarget = to && (to.user_id || to.email);
+  if (!to || to.channel === "none" || !hasTarget) {
     // Either genuinely internal work, or a counterparty we have no channel for
     // yet (suppliers have email, not LINE). Say which, so the operator knows
     // whether to do something about it.
@@ -49,7 +53,7 @@ export async function deliver(
     return { delivered: false, detail };
   }
 
-  if (to.channel === "line") {
+  if (to.channel === "line" && to.user_id) {
     const res = await pushMessage(to.user_id, [{ type: "text", text: body }]);
     if (res.ok) {
       await log(db, approval.business_id, approvalId, "delivered",
@@ -60,6 +64,17 @@ export async function deliver(
     await log(db, approval.business_id, approvalId, "delivery_failed",
       `LINE push failed with ${res.status}; the customer did NOT receive this`);
     return { delivered: false, detail: `LINE push failed (${res.status})` };
+  }
+
+  if (to.channel === "email" && to.email) {
+    const res = await sendEmail({
+      to: to.email,
+      subject: subjectFor(approval.title, to.reference),
+      body,
+    });
+    await log(db, approval.business_id, approvalId,
+      res.sent ? "delivered" : "delivery_failed", res.detail);
+    return { delivered: res.sent, detail: res.detail };
   }
 
   return { delivered: false, detail: `unknown channel ${to.channel}` };

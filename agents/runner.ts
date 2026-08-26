@@ -12,7 +12,38 @@ import { draftApproval } from "../context/decide";
 import { callLlm } from "./llm";
 import { notifyOwner } from "../line/handlers";
 import { planCase } from "./plan";
-import type { Case, CaseStep } from "../context/types";
+import type { ActionType, Case, CaseStep } from "../context/types";
+
+/** Anything going to a supplier goes by email; anything to the customer, LINE. */
+const TO_SUPPLIER: ActionType[] = ["send_rfq", "send_po"];
+
+interface Contact { name: string; role: string; email?: string; line_user_id?: string }
+
+async function recipientFor(
+  db: SupabaseClient,
+  kase: Case,
+  actionType: ActionType
+): Promise<{ channel: "line" | "email" | "none"; user_id?: string; email?: string; label?: string; reference?: string }> {
+  const { data: business } = await db
+    .from("businesses").select("config").eq("id", kase.business_id).single();
+  const contacts = ((business?.config as { contacts?: Contact[] } | null)?.contacts ?? []);
+  const reference = typeof kase.data?.reference === "string" ? kase.data.reference : undefined;
+
+  if (TO_SUPPLIER.includes(actionType)) {
+    const supplier = contacts.find((c) => c.role === "supplier" && c.email);
+    return supplier
+      ? { channel: "email", email: supplier.email, label: supplier.name, reference }
+      : { channel: "none", label: "supplier (no contact on file)" };
+  }
+
+  // Customer-facing. The case records who it is for.
+  const cp = kase.counterparty ?? "";
+  if (cp.startsWith("U")) return { channel: "line", user_id: cp, label: "the customer", reference };
+  const byName = contacts.find((c) => c.role === "customer" && c.name === cp && c.email);
+  return byName
+    ? { channel: "email", email: byName.email, label: byName.name, reference }
+    : { channel: "none", label: cp || "the customer" };
+}
 
 export async function openCase(
   db: SupabaseClient,
@@ -166,7 +197,7 @@ async function runStep(
       payload: {
         body: draft.body,
         missing: draft.missing ?? [],
-        deliver_to: { channel: "none" }, // a real recipient is attached by the caller
+        deliver_to: await recipientFor(db, kase, step.action_type),
         case_id: kase.id,
       },
       snapshot: ctx.snapshot,
