@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "case": "node --env-file=.env.local scripts/open-case.mjs",
     "demo": "node --env-file=.env.local scripts/demo.mjs",
     "demo:reset": "node --env-file=.env.local scripts/demo-reset.mjs",
     "demo:delay": "node --env-file=.env.local scripts/trigger-delay.mjs",

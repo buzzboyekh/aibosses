@@ -88,7 +88,11 @@ export interface DecisionLogEntry {
     | "delivered"
     | "delivery_failed"
     | "delivery_skipped"
-    | "learned";
+    | "learned"
+    | "planned"
+    | "step_done"
+    | "step_failed"
+    | "case_closed";
   reason: string | null;
   approval_id: string | null;
   meta: Record<string, unknown>;
@@ -133,4 +137,48 @@ export interface BuiltContext {
   snapshot: ContextSnapshot;
   role: AgentRole;
   business: Business;
+}
+
+/* ---------------------------------------------------------------------------
+ * Cases: work that takes more than one step and more than one capability.
+ * ------------------------------------------------------------------------- */
+
+export type CaseState =
+  | "planning" | "running" | "waiting" | "blocked" | "done" | "cancelled";
+
+export type StepStatus =
+  | "pending" | "running" | "awaiting_approval" | "awaiting_reply"
+  | "done" | "skipped" | "failed";
+
+export interface Case {
+  id: string;
+  business_id: string;
+  kind: string;
+  title: string;
+  goal: string;
+  state: CaseState;
+  counterparty: string | null;
+  /** What the case has gathered so far. Later steps read what earlier ones wrote. */
+  data: Record<string, unknown>;
+  opened_by: string | null;
+  created_at: string;
+  updated_at: string;
+  closed_at: string | null;
+}
+
+export interface CaseStep {
+  id: string;
+  case_id: string;
+  seq: number;
+  role_key: string;
+  /** null means internal work: thinking, comparing, filing. No approval needed. */
+  action_type: ActionType | null;
+  intent: string;
+  status: StepStatus;
+  input: Record<string, unknown>;
+  output: Record<string, unknown> | null;
+  approval_id: string | null;
+  blocked_reason: string | null;
+  created_at: string;
+  completed_at: string | null;
 }

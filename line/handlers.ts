@@ -7,6 +7,7 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import { decide, markExecuted } from "../context/decide";
 import { deliver } from "../agents/deliver";
+import { onApprovalDecided } from "../agents/runner";
 import { pushMessage } from "./client";
 import { approvalCard, text } from "./templates";
 import { decodePostback } from "./verify";
@@ -40,6 +41,7 @@ export async function handlePostback(
   }
 
   if (action === "reject") {
+    await onApprovalDecided(db, approvalId, "rejected", ownerUserId);
     await pushMessage(ownerUserId, [text("Rejected. The agent is back to draft-only.")]);
     return;
   }
@@ -55,6 +57,9 @@ export async function handlePostback(
         : `Approved. Nothing was sent: ${sent.detail}`
     ),
   ]);
+
+  // If this approval was a step in a longer job, the job carries on now.
+  await onApprovalDecided(db, approvalId, "approved", ownerUserId);
 }
 
 /** Push a drafted approval to the owner's phone. */
