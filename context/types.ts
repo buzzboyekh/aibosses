@@ -116,6 +116,8 @@ export interface ContextSnapshot {
   task: string;
   notes: Pick<ContextNote, "tags" | "content">[];
   documents: Pick<DocumentRecord, "id" | "doc_type" | "extracted">[];
+  /** Figures computed in code and handed to the model, kept so a quote can be audited. */
+  computed?: string;
   assembled_at: string;
 }
 

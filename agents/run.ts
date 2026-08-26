@@ -19,6 +19,8 @@ export async function runAgent(
     actionType: ActionType;
     task: string;
     notifyUserId?: string | null;
+    /** Figures worked out in code. Appended verbatim; the model must not redo them. */
+    computed?: string | null;
   }
 ): Promise<{ approvalId: string; title: string; autoExecuted: boolean }> {
   const ctx = await buildContext(db, args.businessKey, args.roleKey, args.task);
@@ -31,7 +33,11 @@ export async function runAgent(
     );
   }
 
-  const draft = await callLlm(ctx.systemPrompt, ctx.contextBlock);
+  const contextBlock = args.computed
+    ? `${ctx.contextBlock}\n\n${args.computed}`
+    : ctx.contextBlock;
+
+  const draft = await callLlm(ctx.systemPrompt, contextBlock);
 
   // Missing facts are surfaced to the owner rather than quietly invented.
   const reason =
@@ -46,7 +52,9 @@ export async function runAgent(
     actionType: args.actionType,
     title: draft.title,
     payload: { body: draft.body, missing: draft.missing ?? [] },
-    snapshot: ctx.snapshot,
+    snapshot: args.computed
+      ? { ...ctx.snapshot, computed: args.computed }
+      : ctx.snapshot,
     reason,
   });
 

@@ -42,3 +42,11 @@ src = re.sub(r'^\s*let obj: Record<string, unknown>;', '  let obj;', src, flags=
 open('test/llm-parse.mjs','w').write(src)
 PY
 echo "built test/llm-parse.mjs"
+
+# pricing module — compiled properly with tsc rather than regex-stripped.
+# The hand-rolled strippers above predate this and are left alone because they
+# work; anything new should come through the compiler.
+npx --yes tsc agents/pricing.ts --outDir test/gen --module esnext \
+  --target es2022 --moduleResolution bundler --skipLibCheck >/dev/null
+cp test/gen/pricing.js test/pricing.mjs
+echo "built test/pricing.mjs"
