@@ -6,6 +6,7 @@
 
 import { SupabaseClient } from "@supabase/supabase-js";
 import { decide, markExecuted } from "../context/decide";
+import { deliver } from "../agents/deliver";
 import { pushMessage } from "./client";
 import { approvalCard, text } from "./templates";
 import { decodePostback } from "./verify";
@@ -43,10 +44,17 @@ export async function handlePostback(
     return;
   }
 
-  // Approved: this is where the real send would happen (email/LINE to the
-  // customer). The demo stops at marking it executed and logging it.
+  // Approved: mark it executed, then actually send it. Report the real
+  // outcome, never "sent" when nothing left the building.
   await markExecuted(db, approvalId);
-  await pushMessage(ownerUserId, [text("Approved and sent.")]);
+  const sent = await deliver(db, approvalId);
+  await pushMessage(ownerUserId, [
+    text(
+      sent.delivered
+        ? `Approved and sent. (${sent.detail})`
+        : `Approved. Nothing was sent: ${sent.detail}`
+    ),
+  ]);
 }
 
 /** Push a drafted approval to the owner's phone. */

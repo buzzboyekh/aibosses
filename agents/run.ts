@@ -10,6 +10,7 @@ import { draftApproval } from "../context/decide";
 import { notifyOwner, notifyOwnerAutoExecuted } from "../line/handlers";
 import type { ActionType } from "../context/types";
 import { callLlm } from "./llm";
+import { deliver } from "./deliver";
 
 export async function runAgent(
   db: SupabaseClient,
@@ -19,6 +20,8 @@ export async function runAgent(
     actionType: ActionType;
     task: string;
     notifyUserId?: string | null;
+    /** Where an approved draft should be sent. Omit for internal-only work. */
+    deliverTo?: { channel: "line" | "none"; user_id?: string; label?: string } | null;
     /** Figures worked out in code. Appended verbatim; the model must not redo them. */
     computed?: string | null;
   }
@@ -51,7 +54,11 @@ export async function runAgent(
     roleKey: ctx.role.key,
     actionType: args.actionType,
     title: draft.title,
-    payload: { body: draft.body, missing: draft.missing ?? [] },
+    payload: {
+      body: draft.body,
+      missing: draft.missing ?? [],
+      deliver_to: args.deliverTo ?? { channel: "none" },
+    },
     snapshot: args.computed
       ? { ...ctx.snapshot, computed: args.computed }
       : ctx.snapshot,
@@ -60,6 +67,8 @@ export async function runAgent(
 
   if (args.notifyUserId) {
     if (autoExecuted) {
+      // Level 1 skipped the queue, so nothing else will trigger the send.
+      await deliver(db, approval.id);
       // A promoted role acts without asking, but the owner must still SEE it.
       // Previously this path sent nothing at all, so an auto-executed action
       // was invisible until someone happened to open the dashboard.

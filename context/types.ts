@@ -84,7 +84,11 @@ export interface DecisionLogEntry {
     | "executed"
     | "promoted"
     | "demoted"
-    | "auto_executed";
+    | "auto_executed"
+    | "delivered"
+    | "delivery_failed"
+    | "delivery_skipped"
+    | "learned";
   reason: string | null;
   approval_id: string | null;
   meta: Record<string, unknown>;

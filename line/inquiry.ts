@@ -5,6 +5,7 @@ import { runAgent } from "../agents/run";
 import { extractQuoteRequest } from "../agents/extract";
 import { computeQuote, quoteBlock, type PriceList } from "../agents/pricing";
 import { routeInbound, logRoute } from "../agents/route";
+import { remember } from "../agents/remember";
 
 const FENCE = '"' + '""';
 
@@ -68,5 +69,14 @@ export async function runAgentForInquiry(
       "<<<CUSTOMER_MESSAGE\n" + safe + "\nCUSTOMER_MESSAGE>>>",
     computed,
     notifyUserId: ownerUserId,
+    deliverTo: { channel: "line", user_id: customerUserId, label: "the customer" },
   });
+
+  // Learn from it. Best-effort and after the draft, so a failure here can
+  // never cost the customer a reply.
+  try {
+    await remember(db, businessKey, `customer ${customerUserId.slice(0, 10)}`, safe);
+  } catch (err) {
+    console.error("[inquiry] memory step failed", err);
+  }
 }
