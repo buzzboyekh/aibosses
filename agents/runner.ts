@@ -228,6 +228,25 @@ export async function onApprovalDecided(
   await advanceCase(db, step.case_id, ownerUserId);
 }
 
+/**
+ * Put a blocked or failed case back to work. A step that failed is reset to
+ * pending and tried again; without this a transient model error ends the job
+ * permanently, which is not a thing a company does.
+ */
+export async function unblockCase(
+  db: SupabaseClient,
+  caseId: string,
+  ownerUserId?: string | null
+): Promise<{ state: string; ranSteps: number }> {
+  await db.from("case_steps")
+    .update({ status: "pending", blocked_reason: null })
+    .eq("case_id", caseId).eq("status", "failed");
+  await db.from("cases")
+    .update({ state: "running", updated_at: new Date().toISOString() })
+    .eq("id", caseId);
+  return advanceCase(db, caseId, ownerUserId ?? null);
+}
+
 async function closeCase(db: SupabaseClient, kase: Case) {
   await db.from("cases").update({
     state: "done", closed_at: new Date().toISOString(), updated_at: new Date().toISOString(),

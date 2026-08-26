@@ -38,10 +38,15 @@ export async function deliver(
   const body = payload.body ?? approval.title;
 
   if (!to || to.channel === "none" || !to.user_id) {
-    // Internal work: a flag for the owner, a note to file. Nothing to send.
-    await log(db, approval.business_id, approvalId, "delivery_skipped",
-      "internal action, nothing to send");
-    return { delivered: false, detail: "nothing to deliver" };
+    // Either genuinely internal work, or a counterparty we have no channel for
+    // yet (suppliers have email, not LINE). Say which, so the operator knows
+    // whether to do something about it.
+    const isCaseStep = Boolean((payload as { case_id?: string }).case_id);
+    const detail = isCaseStep
+      ? "no send channel for this recipient yet — the draft is on the dashboard, ready to copy"
+      : "internal action, nothing to send";
+    await log(db, approval.business_id, approvalId, "delivery_skipped", detail);
+    return { delivered: false, detail };
   }
 
   if (to.channel === "line") {

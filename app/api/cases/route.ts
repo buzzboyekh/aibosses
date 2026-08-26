@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { waitUntil } from "@vercel/functions";
 import { serverDb } from "../../../context/buildContext";
-import { openCase, advanceCase } from "../../../agents/runner";
+import { openCase, advanceCase, unblockCase } from "../../../agents/runner";
 
 export const runtime = "nodejs";
 
@@ -18,6 +18,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
+
+  // Retry a case that failed or was blocked, rather than opening a new one.
+  if (body.retry) {
+    const state = await unblockCase(serverDb(), String(body.retry),
+      process.env.LINE_OWNER_USER_ID ?? null);
+    return NextResponse.json({ retried: body.retry, ...state });
+  }
+
   const goal = String(body.goal ?? "").trim();
   if (!goal) return NextResponse.json({ error: "goal required" }, { status: 400 });
 
