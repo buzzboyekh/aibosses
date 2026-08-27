@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
 
   const db = serverDb();
   const opened = await openCase(db, {
-    businessKey: process.env.BUSINESS_KEY ?? "demo-import",
+    businessKey: String(body.business ?? process.env.BUSINESS_KEY ?? "demo-import"),
     kind: String(body.kind ?? "general"),
     goal,
     counterparty: body.counterparty ? String(body.counterparty) : null,

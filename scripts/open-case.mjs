@@ -2,7 +2,12 @@
 //
 //   npm run case -- "Source 1000 pcs of 195/65R15 at the best total landed cost for a Rotterdam customer, and get a purchase order ready"
 
-const goal = process.argv.slice(2).filter((a) => !a.startsWith("--")).join(" ");
+const argv = process.argv.slice(2);
+const bizAt = argv.indexOf("--business");
+const business = bizAt > -1 ? argv[bizAt + 1] : undefined;
+const goal = argv
+  .filter((a, i) => !a.startsWith("--") && i !== bizAt + 1)
+  .join(" ");
 if (!goal) throw new Error('give it a goal: npm run case -- "..."');
 
 const BASE = process.env.DEPLOY_URL ?? "https://aibosses.vercel.app";
@@ -12,7 +17,7 @@ if (!KEY) throw new Error("DASHBOARD_KEY missing from .env.local");
 const res = await fetch(`${BASE}/api/cases`, {
   method: "POST",
   headers: { "Content-Type": "application/json", "x-demo-key": KEY },
-  body: JSON.stringify({ goal, kind: "sourcing" }),
+  body: JSON.stringify({ goal, kind: "sourcing", business }),
 });
 const out = await res.json();
 console.log(res.status, JSON.stringify(out, null, 2));

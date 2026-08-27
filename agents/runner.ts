@@ -241,10 +241,21 @@ export async function onApprovalDecided(
     .from("case_steps").select("*").eq("approval_id", approvalId).maybeSingle();
   if (!step) return; // a one-off approval, not part of a case
 
+  // Sending a request for quotation does not complete the step, it starts the
+  // wait. The case parks until suppliers answer (see agents/reply.ts).
+  const expectsReply = decision === "approved" && step.action_type === "send_rfq";
+
   await db.from("case_steps").update({
-    status: decision === "approved" ? "done" : "skipped",
-    completed_at: new Date().toISOString(),
+    status: decision === "approved" ? (expectsReply ? "awaiting_reply" : "done") : "skipped",
+    completed_at: expectsReply ? null : new Date().toISOString(),
   }).eq("id", step.id);
+
+  if (expectsReply) {
+    await db.from("cases")
+      .update({ state: "waiting", updated_at: new Date().toISOString() })
+      .eq("id", step.case_id);
+    return; // nothing more to do until someone replies
+  }
 
   if (decision === "rejected") {
     // A rejection is a decision about the job, not just the message. Stop and
