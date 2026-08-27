@@ -69,11 +69,17 @@ export async function parseReply(body: string): Promise<ParsedReply> {
       typeof v === "number" && Number.isFinite(v) ? v : null;
     const str = (v: unknown) =>
       typeof v === "string" && v.trim() ? v.trim() : null;
+    // A supplier saying "no minimum" is MOQ 1, not 0. Zero reads as "unknown"
+    // downstream and made the comparison say MOQ 1 anyway, from a different
+    // guess. Decide it here, once.
+    const rawMoq = num(o.moq);
+    const moq = rawMoq === 0 ? 1 : rawMoq;
+
     return {
       supplier: str(o.supplier),
       unit_price: num(o.unit_price),
       currency: str(o.currency),
-      moq: num(o.moq),
+      moq,
       lead_time_days: num(o.lead_time_days),
       incoterm: str(o.incoterm),
       notes: str(o.notes),

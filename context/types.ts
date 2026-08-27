@@ -94,7 +94,8 @@ export interface DecisionLogEntry {
     | "step_failed"
     | "case_closed"
     | "session_reset"
-    | "reply_received";
+    | "reply_received"
+    | "redrafted";
   reason: string | null;
   approval_id: string | null;
   meta: Record<string, unknown>;
@@ -129,6 +130,8 @@ export interface ContextSnapshot {
   documents: Pick<DocumentRecord, "id" | "doc_type" | "extracted">[];
   /** Figures computed in code and handed to the model, kept so a quote can be audited. */
   computed?: string;
+  /** What the operator said when they rejected the previous draft. */
+  correction?: string;
   assembled_at: string;
 }
 

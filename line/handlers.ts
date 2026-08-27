@@ -8,6 +8,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { decide, markExecuted } from "../context/decide";
 import { deliver } from "../agents/deliver";
 import { onApprovalDecided } from "../agents/runner";
+import { askForCorrection, pendingCorrection, redraft } from "../agents/redraft";
 import { pushMessage } from "./client";
 import { approvalCard, text } from "./templates";
 import { decodePostback } from "./verify";
@@ -42,7 +43,14 @@ export async function handlePostback(
 
   if (action === "reject") {
     await onApprovalDecided(db, approvalId, "rejected", ownerUserId);
-    await pushMessage(ownerUserId, [text("Rejected. The agent is back to draft-only.")]);
+    await askForCorrection(db, approvalId);
+    await pushMessage(ownerUserId, [
+      text(
+        "Rejected, and the agent is back to draft-only.\n\n" +
+        "Tell me what should change and I'll redraft it. " +
+        "Or say \"skip\" to leave it."
+      ),
+    ]);
     return;
   }
 
@@ -111,9 +119,42 @@ export async function handleText(
     return;
   }
   if (userId === ownerUserId) {
-    if (message.trim().toLowerCase() === "ping") {
+    const said = message.trim();
+    if (said.toLowerCase() === "ping") {
       await pushMessage(userId, [text("pong — webhook is live")]);
+      return;
     }
+
+    // If the last thing he did was reject something, this is why.
+    const businessKey = process.env.BUSINESS_KEY ?? "demo-import";
+    const { data: business } = await db
+      .from("businesses").select("id").eq("key", businessKey).single();
+    const waiting = business ? await pendingCorrection(db, business.id) : null;
+
+    if (waiting) {
+      if (said.toLowerCase() === "skip") {
+        await db.from("approvals").update({
+          payload: { ...(waiting.payload ?? {}), awaiting_correction: false },
+        }).eq("id", waiting.id);
+        await pushMessage(userId, [text("Left it. Nothing redrafted.")]);
+        return;
+      }
+      await pushMessage(userId, [text("Redrafting with that in mind…")]);
+      const out = await redraft(db, waiting, said);
+      if (out) {
+        await notifyOwner(userId, {
+          approvalId: out.approvalId,
+          roleName: out.roleName,
+          title: out.title,
+          body: out.body,
+          reason: `redrafted: ${said.slice(0, 100)}`,
+        });
+      } else {
+        await pushMessage(userId, [text("Could not redraft that one. It is still rejected.")]);
+      }
+      return;
+    }
+
     return; // the owner approves, he does not generate work for himself
   }
 
