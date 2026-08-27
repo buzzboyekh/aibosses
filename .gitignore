@@ -12,3 +12,4 @@ next-env.d.ts
 test/llm-parse.mjs
 test/pricing.mjs
 test/gen/
+test/remember.mjs

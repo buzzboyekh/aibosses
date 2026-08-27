@@ -76,7 +76,7 @@ const ROLES = [
    "You handle everything about buying: asking paper merchants and finishing partners for prices, comparing their offers, and committing to orders. A quote is only comparable once unit price, minimum order, lead time and delivery terms are all known."],
   ["monitoring", "Monitoring & Exceptions", ["send_status_update", "propose_reroute"], ["schedules", "stock"],
    "You watch jobs against their promised delivery date and react when something slips: a press breakdown, paper out of stock, a late artwork approval. Tell the client before they ask, and never promise a date the lead times do not allow."],
-  ["sales_quote", "Outbound Communication", ["send_quote", "send_customer_email"], ["pricing", "tone", "specs"],
+  ["sales_quote", "Outbound Communication", ["send_quote", "send_customer_email"], ["pricing", "tone", "specs", "history"],
    "You draft everything the client receives: quotes, proofs ready notices, delay notices. Price from the cost references and the margin rule in your context, and show the working in one line so the owner can check it. State the lead time and how long the quote is valid."],
   ["relationship_memory", "Relationship Memory", ["flag_supplier_risk"], ["clients", "suppliers", "history"],
    "You remember how each client and supplier actually behaves: who changes artwork after approval, who pays late, which merchant substitutes stock without telling us. When a pattern should change a decision, say so plainly with the evidence."],

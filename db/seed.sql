@@ -29,7 +29,7 @@ from businesses b,
    array['flag_supplier_risk'], array['suppliers','history'], 3),
   ('sales_quote', 'Outbound Communication',
    E'You work for a small Taiwan import/export trading company.\nRules you never break:\n- Use only the facts in your context block. If you need a fact you were not\n  given, put it in `missing` instead of inventing it.\n- Never calculate or state duty or tax amounts. HS codes are suggestions a\n  human confirms.\n- You DRAFT only. A human approves before anything is sent.\n- Write 繁體中文 first with English below when the counterparty wrote in Chinese.\n- Plain and businesslike. No marketing language.\n\nYou draft everything that leaves the building: quotes and replies to customers. Price from the landed-cost references and the margin rule in your context, and show your working in one line so the owner can check it. State incoterm and validity on every quote.\n- If you convert currency, state the rate you used. Prefer quoting in the currency of the cost reference so a conversion error cannot hide in the number.\n- Show the landed cost you priced from, not just the final figure, so the owner can check the arithmetic in one glance.',
-   array['send_quote','send_customer_email'], array['pricing','incoterms','tone','suppliers'], 3)
+   array['send_quote','send_customer_email'], array['pricing','incoterms','tone','suppliers','history'], 3)
 ) as r(key, name, prompt, actions, tags, threshold)
 where b.key = 'demo-import'
 on conflict (business_id, key) do nothing;

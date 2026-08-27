@@ -9,6 +9,7 @@
 
 import { SupabaseClient } from "@supabase/supabase-js";
 import { advanceCase } from "./runner";
+import { tagVocabulary, validateTags } from "./remember";
 import type { CaseStep } from "../context/types";
 
 export interface ParsedReply {
@@ -93,6 +94,79 @@ export async function parseReply(body: string): Promise<ParsedReply> {
 }
 
 /**
+ * Turn one parsed reply into durable facts about that supplier.
+ *
+ * These come from the structured fields, not from prose, so they are cheap and
+ * consistent: did they quote completely, what lead time do they actually
+ * state, what is their real minimum, and how fast did they answer. Two or
+ * three short facts per reply, not one per field.
+ *
+ * Tagged `suppliers` and `history` on purpose: those are the tags `ops_po` and
+ * `relationship_memory` subscribe to, so the next sourcing case can read them.
+ */
+async function rememberSupplier(
+  db: SupabaseClient,
+  businessId: string,
+  supplierName: string,
+  parsed: ParsedReply,
+  hoursToReply: number | null
+): Promise<number> {
+  const facts: string[] = [];
+
+  if (parsed.missing.length) {
+    facts.push(
+      `${supplierName} quoted without giving ${parsed.missing.join(" or ")}. ` +
+      `Ask for it up front next time; a quote is not comparable without it.`
+    );
+  } else if (parsed.unit_price !== null) {
+    facts.push(`${supplierName} gives complete quotes: price, MOQ, lead time and incoterm together.`);
+  }
+
+  if (parsed.lead_time_days !== null) {
+    facts.push(`${supplierName} states a lead time of about ${parsed.lead_time_days} days.`);
+  }
+  if (parsed.moq !== null && parsed.moq > 1) {
+    facts.push(`${supplierName} has a minimum order of ${parsed.moq}.`);
+  }
+  if (hoursToReply !== null && hoursToReply >= 0) {
+    const speed = hoursToReply < 24 ? "within a day" : `after about ${Math.round(hoursToReply / 24)} days`;
+    facts.push(`${supplierName} answered a request for quotation ${speed}.`);
+  }
+  if (parsed.notes) {
+    facts.push(`${supplierName}: ${parsed.notes}`);
+  }
+  if (!facts.length) return 0;
+
+  const vocabulary = await tagVocabulary(db, businessId);
+  const tags = validateTags(["suppliers", "history"], vocabulary);
+
+  const { data: existing } = await db
+    .from("context_notes").select("content").eq("business_id", businessId);
+  const known = new Set(
+    (existing ?? []).map((n: { content: string }) => n.content.toLowerCase().trim())
+  );
+  const fresh = facts.filter((c) => !known.has(c.toLowerCase().trim())).slice(0, 4);
+  if (!fresh.length) return 0;
+
+  await db.from("context_notes").insert(
+    fresh.map((content) => ({
+      business_id: businessId, tags, content,
+      source: `learned from ${supplierName}`,
+    }))
+  );
+
+  await db.from("decision_log").insert({
+    business_id: businessId,
+    actor: "agent:relationship_memory",
+    action: "learned",
+    reason: fresh.join(" · ").slice(0, 300),
+    meta: { counterparty: supplierName, count: fresh.length },
+  });
+
+  return fresh.length;
+}
+
+/**
  * Take a reply, attach it to the case, and work the case forward if it now has
  * everything it was waiting for.
  */
@@ -119,6 +193,18 @@ export async function ingestReply(
     data: { ...(kase.data ?? {}), replies: next },
     updated_at: new Date().toISOString(),
   }).eq("id", args.caseId);
+
+  // What this reply teaches us about the supplier, kept beyond this case.
+  const supplierName = args.from;
+  const rfqSentAt = typeof kase.data?.rfq_sent_at === "string" ? kase.data.rfq_sent_at : null;
+  const hoursToReply = rfqSentAt
+    ? (Date.now() - new Date(rfqSentAt).getTime()) / 36e5
+    : null;
+  try {
+    await rememberSupplier(db, kase.business_id, supplierName, parsed, hoursToReply);
+  } catch (err) {
+    console.error("[reply] could not record what this teaches us", err);
+  }
 
   await db.from("decision_log").insert({
     business_id: kase.business_id,

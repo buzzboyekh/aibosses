@@ -8,8 +8,27 @@
 //   node test/build.mjs
 
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+
+/**
+ * tsc flattens output only when the file has no local imports. Anything that
+ * imports from another directory (plan.ts -> context/types) drags that file
+ * into the program, and tsc then mirrors the source tree instead. So find the
+ * emitted file rather than assuming where it landed.
+ */
+function findEmitted(dir, base) {
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) {
+      const hit = findEmitted(full, base);
+      if (hit) return hit;
+    } else if (entry === base) {
+      return full;
+    }
+  }
+  return null;
+}
 
 const root = new URL("..", import.meta.url).pathname;
 const gen = join(root, "test", "gen");
@@ -24,7 +43,9 @@ function compile(src, outName) {
     { cwd: root, stdio: "pipe" }
   );
   const base = src.split("/").pop().replace(/\.ts$/, ".js");
-  copyFileSync(join(gen, base), join(root, "test", outName));
+  const emitted = findEmitted(gen, base);
+  if (!emitted) throw new Error(`tsc produced no ${base} anywhere under ${gen}`);
+  copyFileSync(emitted, join(root, "test", outName));
 }
 
 // Pure modules: tsc handles them directly.
@@ -40,13 +61,21 @@ compile("agents/llm.ts", "llm-parse.mjs");
 // tests can hand it an in-memory fake.
 compile("context/decide.ts", "decide.mjs");
 
+// remember.ts imports the Supabase client for its type only, same as decide.ts.
+compile("agents/remember.ts", "remember.mjs");
+compile("agents/plan.ts", "plan.mjs");
+
 // The emitted decide.mjs imports ./types.js for types that no longer exist at
 // runtime; strip any leftover relative import of it.
-const decidePath = join(root, "test", "decide.mjs");
-writeFileSync(
-  decidePath,
-  readFileSync(decidePath, "utf8").replace(/^import .*['"]\.\.?\/.*types(\.js)?['"];?\s*$/gm, "")
-);
+for (const f of ["decide.mjs", "remember.mjs", "plan.mjs"]) {
+  const path = join(root, "test", f);
+  writeFileSync(
+    path,
+    readFileSync(path, "utf8")
+      .replace(/^import .*['"]\.\.?\/.*types(\.js)?['"];?\s*$/gm, "")
+      .replace(/^import .*['"]\.\/runner(\.js)?['"];?\s*$/gm, "")
+  );
+}
 
 rmSync(gen, { recursive: true, force: true });
-console.log("built test modules: pricing, line-verify, llm-parse, decide");
+console.log("built test modules: pricing, line-verify, llm-parse, decide, remember, plan");

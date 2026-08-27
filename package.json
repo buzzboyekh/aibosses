@@ -11,7 +11,7 @@
     "demo": "node --env-file=.env.local scripts/demo.mjs",
     "demo:reset": "node --env-file=.env.local scripts/demo-reset.mjs",
     "demo:delay": "node --env-file=.env.local scripts/trigger-delay.mjs",
-    "test": "node test/build.mjs && node test/decide.test.mjs && node test/line.test.mjs && node test/llm.test.mjs && node test/pricing.test.mjs"
+    "test": "node test/build.mjs && node test/decide.test.mjs && node test/line.test.mjs && node test/llm.test.mjs && node test/pricing.test.mjs && node test/memory.test.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.4",

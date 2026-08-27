@@ -251,8 +251,15 @@ export async function onApprovalDecided(
   }).eq("id", step.id);
 
   if (expectsReply) {
+    // Stamp the send so responsiveness can be measured when replies land.
+    const { data: kase } = await db
+      .from("cases").select("data").eq("id", step.case_id).single();
     await db.from("cases")
-      .update({ state: "waiting", updated_at: new Date().toISOString() })
+      .update({
+        state: "waiting",
+        data: { ...(kase?.data ?? {}), rfq_sent_at: new Date().toISOString() },
+        updated_at: new Date().toISOString(),
+      })
       .eq("id", step.case_id);
     return; // nothing more to do until someone replies
   }

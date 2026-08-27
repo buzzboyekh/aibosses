@@ -126,7 +126,7 @@ export interface ContextSnapshot {
   role_key: string;
   business_key: string;
   task: string;
-  notes: Pick<ContextNote, "tags" | "content">[];
+  notes: Pick<ContextNote, "tags" | "content" | "source">[];
   documents: Pick<DocumentRecord, "id" | "doc_type" | "extracted">[];
   /** Figures computed in code and handed to the model, kept so a quote can be audited. */
   computed?: string;

@@ -36,6 +36,39 @@ const PURPOSE: Record<string, string> = {
     "judging how a counterparty has behaved over time, from history rather than this one deal",
 };
 
+/**
+ * The only instruction the memory agent gets beyond its own job description.
+ * The last clause is the anti-invention guard: an agent that has learned
+ * nothing about a supplier must say so rather than produce a plausible
+ * character assessment out of thin air.
+ */
+export const MEMORY_INTENT =
+  "Check what we have on record about each supplier who replied and say " +
+  "whether any of it should change which one we pick. Name the supplier, " +
+  "quote the record, and say plainly where we have no record at all.";
+
+/**
+ * Put the memory step into a sourcing plan, right after the request for
+ * quotation. Deterministic rather than left to the planner: asked to keep
+ * plans short, it never once chose this role, so the capability existed and
+ * never ran.
+ *
+ * Internal (action_type null) on purpose. As an outbound action it would queue
+ * an approval in the middle of the job and stall the run.
+ */
+export function withMemoryStep(steps: PlannedStep[]): PlannedStep[] {
+  if (steps.some((s) => s.role_key === "relationship_memory")) return steps;
+  const afterRfq = steps.map((s) => s.action_type).lastIndexOf("send_rfq");
+  if (afterRfq === -1) return steps; // not a sourcing job, leave it alone
+  const out = [...steps];
+  out.splice(afterRfq + 1, 0, {
+    role_key: "relationship_memory",
+    action_type: null,
+    intent: MEMORY_INTENT,
+  });
+  return out.slice(0, 7);
+}
+
 export interface PlannedStep {
   role_key: string;
   action_type: ActionType | null;
@@ -122,6 +155,13 @@ export async function planCase(
     if (typeof s.role_key !== "string" || !allowed.has(s.role_key)) continue;
     if (typeof s.intent !== "string" || !s.intent.trim()) continue;
     let action: ActionType | null = null;
+    if (s.role_key === "relationship_memory") {
+      // Memory reasons about counterparties; it never sends anything. An
+      // outbound action here stalls the job waiting for an approval nobody
+      // expects.
+      steps.push({ role_key: s.role_key, action_type: null, intent: s.intent.trim() });
+      continue;
+    }
     const rawAction = s.action_type as unknown;
     if (typeof rawAction === "string" && rawAction !== "null" && rawAction !== "") {
       if (!allowed.get(s.role_key)!.has(rawAction)) continue; // not permitted: drop the step
@@ -134,5 +174,12 @@ export async function planCase(
   const title = typeof parsed.title === "string" && parsed.title.trim()
     ? parsed.title.trim()
     : goal.slice(0, 60);
-  return { title, steps };
+
+  // Only if this business actually has the role; otherwise runStep would throw
+  // "role not found" and block the case.
+  const withMemory = allowed.has("relationship_memory") ? withMemoryStep(steps) : steps;
+  if (withMemory.length === steps.length && allowed.has("relationship_memory")) {
+    console.log("[plan] no send_rfq step, so no memory step was added");
+  }
+  return { title, steps: withMemory };
 }
