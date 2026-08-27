@@ -92,7 +92,8 @@ export interface DecisionLogEntry {
     | "planned"
     | "step_done"
     | "step_failed"
-    | "case_closed";
+    | "case_closed"
+    | "session_reset";
   reason: string | null;
   approval_id: string | null;
   meta: Record<string, unknown>;

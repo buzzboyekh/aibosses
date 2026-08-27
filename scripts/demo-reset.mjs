@@ -1,41 +1,58 @@
-// Put the demo back to its opening state. Run before every rehearsal and once
-// more immediately before going on stage.
+// Put the demo back to its opening state WITHOUT deleting anything.
 //
-// Why this exists: promote_threshold is 3, so three successful rehearsals
-// promote the quoting agent to Level 1 and the approval card stops appearing.
-// The demo then has no second act and gives no error explaining why.
+// The old version deleted decision_log rows, which quietly contradicted the
+// thing we claim on stage: that the log is append-only and every action is on
+// the record. Eric noticed the row count go down. If a judge can make rows
+// disappear, the audit trail is not an audit trail.
 //
-//   node --env-file=.env.local scripts/demo-reset.mjs
-//   node --env-file=.env.local scripts/demo-reset.mjs --keep-log
+// So this deletes nothing. It resets autonomy, closes out anything still open,
+// and writes a `session_reset` marker. Views show entries since the most
+// recent marker, which gives a clean demo and an intact history.
+//
+//   npm run demo:reset
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing");
 const H = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
-const keepLog = process.argv.includes("--keep-log");
 
-const patch = async (path, body) => {
-  const r = await fetch(`${url}/rest/v1/${path}`, { method: "PATCH", headers: H, body: JSON.stringify(body) });
-  if (!r.ok) throw new Error(`${path}: ${r.status} ${await r.text()}`);
-};
-const del = async (path) => {
-  const r = await fetch(`${url}/rest/v1/${path}`, { method: "DELETE", headers: H });
-  if (!r.ok) throw new Error(`${path}: ${r.status} ${await r.text()}`);
+const api = async (path, method, body) => {
+  const r = await fetch(`${url}/rest/v1/${path}`, {
+    method, headers: H, body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!r.ok) throw new Error(`${method} ${path}: ${r.status} ${await r.text()}`);
+  return r;
 };
 
-// Roles back to draft-only with a clean counter.
-await patch("agent_roles?id=not.is.null", { autonomy_level: 0, clean_approvals: 0 });
+const businesses = await (await fetch(`${url}/rest/v1/businesses?select=id`, { headers: H })).json();
 
-if (!keepLog) {
-  // decision_log first: it references approvals.
-  await del("decision_log?id=not.is.null");
-  await del("approvals?id=not.is.null");
+// 1. Every agent back to draft-only with a clean counter.
+await api("agent_roles?id=not.is.null", "PATCH", { autonomy_level: 0, clean_approvals: 0 });
+
+// 2. Anything still waiting is closed out rather than removed, so the record
+//    of it having existed survives.
+const now = new Date().toISOString();
+await api("approvals?state=eq.pending_approval", "PATCH", {
+  state: "rejected", decided_by: "system",
+  decision_reason: "superseded by a demo reset", decided_at: now,
+});
+await api("cases?state=in.(planning,running,waiting,blocked)", "PATCH", {
+  state: "cancelled", updated_at: now, closed_at: now,
+});
+await api("case_steps?status=in.(pending,running,awaiting_approval,awaiting_reply)", "PATCH", {
+  status: "skipped", completed_at: now,
+});
+
+// 3. The marker. Everything after this is the new session.
+for (const b of businesses) {
+  await api("decision_log", "POST", {
+    business_id: b.id, actor: "system", action: "session_reset",
+    reason: "demo reset — history above this line is from an earlier run",
+  });
 }
 
 const roles = await (await fetch(`${url}/rest/v1/agent_roles?select=name,autonomy_level,clean_approvals,promote_threshold`, { headers: H })).json();
-const pending = await (await fetch(`${url}/rest/v1/approvals?select=id&state=eq.pending_approval`, { headers: H })).json();
 const log = await (await fetch(`${url}/rest/v1/decision_log?select=id`, { headers: H })).json();
-
-console.log("demo reset" + (keepLog ? " (log kept)" : ""));
+console.log("demo reset — nothing deleted");
 for (const r of roles) console.log(`  ${r.name}: level ${r.autonomy_level}, ${r.clean_approvals}/${r.promote_threshold}`);
-console.log(`  pending approvals: ${pending.length} · log rows: ${log.length}`);
+console.log(`  decision_log intact: ${log.length} rows (view starts after the new marker)`);

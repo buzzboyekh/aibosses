@@ -57,7 +57,7 @@ export default async function Dashboard({
     db.from("approvals").select("id,title,action_type,state,decided_by,created_at,payload")
       .order("created_at", { ascending: false }).limit(15),
     db.from("decision_log").select("id,actor,action,reason,created_at")
-      .order("id", { ascending: false }).limit(25),
+      .order("id", { ascending: false }).limit(60),
     db.from("agent_roles").select("key,name,autonomy_level,clean_approvals,promote_threshold")
       .order("key"),
     db.from("cases").select("id,title,goal,state,kind,updated_at")
@@ -67,6 +67,13 @@ export default async function Dashboard({
   ]);
 
   const pending = (approvals ?? []).filter((a: Approval) => a.state === "pending_approval");
+
+  // The log is append-only, so a reset writes a marker rather than deleting.
+  // Show this session; older history is still in the table.
+  const allLog = (log ?? []) as LogRow[];
+  const markerAt = allLog.findIndex((e) => e.action === "session_reset");
+  const sessionLog = markerAt === -1 ? allLog : allLog.slice(0, markerAt);
+  const earlier = markerAt === -1 ? 0 : allLog.length - markerAt - 1;
 
   return (
     <main style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 20px 64px", color: "#111" }}>
@@ -159,10 +166,11 @@ export default async function Dashboard({
       <h2 style={sectionStyle}>Decision log</h2>
       <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
         Append-only. Every action, who took it, and why.
+        {earlier > 0 ? ` Showing this session; ${earlier} earlier entries are kept below the last reset.` : ""}
       </p>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <tbody>
-          {(log ?? []).map((e: LogRow) => (
+          {sessionLog.map((e: LogRow) => (
             <tr key={e.id} style={{ borderBottom: "1px solid #eee" }}>
               <td style={{ padding: "7px 8px", color: "#888", whiteSpace: "nowrap", width: 70 }}>
                 {time(e.created_at)}

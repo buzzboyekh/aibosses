@@ -12,6 +12,30 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { ActionType } from "../context/types";
 
+/**
+ * What each capability is FOR, not just what it may send. Without this the
+ * planner picked by vocabulary: it put "compare supplier quotes" on Document
+ * Intelligence because both involve documents, when comparing prices is a
+ * buying decision.
+ */
+const PURPOSE: Record<string, string> = {
+  orchestrator:
+    "routing work and escalating what fits nowhere. Never do the work itself",
+  doc_check:
+    "reading documents and cross-checking them AGAINST EACH OTHER for contradictions " +
+    "(invoice vs packing list vs order). NOT for choosing between commercial offers",
+  ops_po:
+    "everything about buying: asking suppliers for prices, COMPARING their offers, " +
+    "choosing one, and committing to an order. All supplier-facing work",
+  monitoring:
+    "watching a shipment against its plan and reacting when it slips",
+  sales_quote:
+    "everything the CUSTOMER receives: quotes, replies, notices. Customer-facing only, " +
+    "never supplier-facing",
+  relationship_memory:
+    "judging how a counterparty has behaved over time, from history rather than this one deal",
+};
+
 export interface PlannedStep {
   role_key: string;
   action_type: ActionType | null;
@@ -36,7 +60,13 @@ const SYSTEM = (roster: string) => [
   "  by a human, so use them sparingly, at the real decision points.",
   "- Order matters: gather before comparing, compare before recommending,",
   "  recommend before committing.",
-  "- `intent` is one line saying what this step is for.",
+  "- `intent` is one line saying what this step is for. It must match the",
+  "  action_type: do not write \"request quotes\" on a step whose action is",
+  "  send_po. If the step asks for prices it is send_rfq; if it commits to an",
+  "  order it is send_po.",
+  "- Pick the capability by what the step IS FOR, not by vocabulary overlap.",
+  "  Comparing supplier prices is a buying decision (ops_po), not a document",
+  "  check. Writing to a customer is sales_quote even if it concerns a document.",
 ].join("\n");
 
 export async function planCase(
@@ -57,7 +87,8 @@ export async function planCase(
   );
   const roster = roles
     .map((r: { key: string; name: string; action_types: string[] }) =>
-      `- ${r.key} (${r.name}) may draft: ${r.action_types.join(", ") || "nothing, internal work only"}`)
+      `- ${r.key} (${r.name}) — ${PURPOSE[r.key] ?? "general work"}. May draft: ` +
+      `${r.action_types.join(", ") || "nothing, internal work only"}`)
     .join("\n");
 
   const key = process.env.OPENAI_API_KEY;
