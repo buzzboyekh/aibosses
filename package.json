@@ -9,6 +9,7 @@
     "reply": "node --env-file=.env.local scripts/supplier-reply.mjs",
     "case": "node --env-file=.env.local scripts/open-case.mjs",
     "demo": "node --env-file=.env.local scripts/demo.mjs",
+    "preflight": "node --env-file=.env.local scripts/preflight.mjs",
     "prove": "node --env-file=.env.local scripts/prove-memory.mjs",
     "demo:reset": "node --env-file=.env.local scripts/demo-reset.mjs",
     "demo:delay": "node --env-file=.env.local scripts/trigger-delay.mjs",
