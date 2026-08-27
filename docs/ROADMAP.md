@@ -103,7 +103,7 @@ load-bearing.
 | **Tim** | Live activity stream on the dashboard | it updates while a demo runs |
 | **Eric** | `/documents` upload → extract → mismatch → approval | two real PDFs produce a real flagged discrepancy |
 | **Kun** | Pitch script + the three questions rehearsed verbatim | said out loud, twice, to a timer |
-| **Kun** | **Fallback video recorded** (`npm run demo -- --auto`) | file exists, 3 min, before SEMICON |
+| **Kun** | **Fallback video recorded** — see `docs/RECORDING.md`, record interactively so the approvals are real | file exists, ~3 min, before SEMICON |
 | **Kun** | LINE push quota checked, topped up if short | number known, not assumed |
 | any | Second business config | 20 seconds of a different business running |
 

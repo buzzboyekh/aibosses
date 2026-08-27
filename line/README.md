@@ -43,7 +43,7 @@ Paste that into the env and redeploy. Only that user's taps are accepted.
 ## Tests
 
 ```bash
-./test/build-mjs.sh && node test/line.test.mjs
+node test/build.mjs && node test/line.test.mjs
 ```
 
 ## Setup checklist

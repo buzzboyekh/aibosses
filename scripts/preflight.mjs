@@ -83,7 +83,7 @@ if (LTOK) {
     const limit = q?.type === "limited" ? q.value : Infinity;
     const used = c?.totalUsage ?? 0;
     const left = limit - used;
-    const runs = Math.floor(left / 5); // a full demo costs about five pushes
+    const runs = Math.floor(left / 7); // counted the call sites: ~7 pushes per full run
     if (!Number.isFinite(limit)) ok("LINE quota", "unlimited plan");
     else if (left < 20) bad("LINE quota", `${left} of ${limit} left — about ${runs} runs`,
       "upgrade the LINE plan, or rehearse against a second throwaway Official Account");
@@ -97,20 +97,50 @@ if (LTOK) {
 
 // --- 5. the model has credit ------------------------------------------------
 // An account with a valid key and no balance is exactly how this failed before.
-if (OKEY) {
-  const r = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${OKEY}` },
-    body: JSON.stringify({ model: process.env.LLM_MODEL ?? "gpt-4o-mini", max_tokens: 1,
-      messages: [{ role: "user", content: "ok" }] }),
-  });
-  if (r.ok) ok("model", "key works and the account has credit");
-  else {
-    const t = (await r.text()).slice(0, 120);
-    bad("model", `${r.status} ${t}`, r.status === 429
-      ? "the OpenAI account is out of credit — top it up at platform.openai.com/settings/organization/billing"
-      : "check OPENAI_API_KEY");
+// Test whichever provider will ACTUALLY run: agents/llm.ts picks Anthropic when
+// its key is present. Testing OpenAI unconditionally would post a Claude model
+// id to OpenAI and report a false failure on a healthy system.
+const provider = process.env.LLM_PROVIDER ??
+  (process.env.ANTHROPIC_API_KEY ? "anthropic" : "openai");
+{
+  const akey = process.env.ANTHROPIC_API_KEY;
+  if (provider === "anthropic" && !akey) {
+    bad("model", "LLM_PROVIDER=anthropic but ANTHROPIC_API_KEY is unset", "set the key or unset LLM_PROVIDER");
+  } else if (provider === "anthropic") {
+    const r = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": akey, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model: process.env.LLM_MODEL ?? "claude-sonnet-4-5", max_tokens: 1,
+        messages: [{ role: "user", content: "ok" }] }),
+    });
+    if (r.ok) ok("model", `anthropic, ${process.env.LLM_MODEL ?? "claude-sonnet-4-5"}, has credit`);
+    else bad("model", `anthropic ${r.status} ${(await r.text()).slice(0, 100)}`, "check ANTHROPIC_API_KEY and its balance");
+  } else if (!OKEY) {
+    bad("model", "OPENAI_API_KEY unset", "add it to .env.local");
+  } else {
+    const model = process.env.LLM_MODEL ?? "gpt-4o-mini";
+    const r = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${OKEY}` },
+      body: JSON.stringify({ model, max_tokens: 1, messages: [{ role: "user", content: "ok" }] }),
+    });
+    if (r.ok) ok("model", `openai, ${model}, key works and the account has credit`);
+    else {
+      const t = (await r.text()).slice(0, 120);
+      bad("model", `openai ${r.status} ${t}`, r.status === 429
+        ? "the account is out of credit — top up at platform.openai.com/settings/organization/billing"
+        : "check OPENAI_API_KEY, and that LLM_MODEL is an OpenAI model id");
+    }
   }
+}
+
+// Email fails soft by design, so a supplier-email beat degrades silently on
+// camera unless someone says so here.
+if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
+  warn("email", "not configured — supplier drafts will say so rather than send",
+    "fine for the demo; set RESEND_API_KEY and EMAIL_FROM if you want real sends");
+} else {
+  ok("email", "configured");
 }
 
 // --- 6. the data the demo depends on ---------------------------------------

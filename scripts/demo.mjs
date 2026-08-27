@@ -49,13 +49,15 @@ async function customerSays(text, userId = "Ustage00000000000000000000000001") {
 }
 
 async function waitForDraft(sinceIso, label) {
-  process.stdout.write(dim("   agent thinking"));
+  const started = Date.now();
   for (let i = 0; i < 40; i++) {
     await sleep(1500);
-    process.stdout.write(dim("."));
+    const secs = Math.round((Date.now() - started) / 1000);
+    process.stdout.write(`\r   ${dim(`agent working… ${secs}s`)}   `);
     const rows = await (await fetch(`${URL_}/rest/v1/approvals?select=title,payload,created_at&created_at=gt.${sinceIso}&order=created_at.desc&limit=1`, { headers: H })).json();
     if (rows.length) {
-      console.log("\n" + cyan(`   ${label}: ${rows[0].title}`));
+      process.stdout.write("\r" + " ".repeat(40) + "\r");
+      console.log(cyan(`   ${label}: ${rows[0].title}`));
       console.log(dim("   " + String(rows[0].payload?.body ?? "").split("\n").slice(0, 4).join("\n   ")));
       return rows[0];
     }
@@ -66,14 +68,38 @@ async function waitForDraft(sinceIso, label) {
 
 const now = () => new Date().toISOString();
 
+/** Approve whatever is pending, exactly as tapping the card does. */
+async function approvePending() {
+  const rows = await (await fetch(
+    `${URL_}/rest/v1/approvals?select=id&state=eq.pending_approval&order=created_at.desc&limit=1`,
+    { headers: H }
+  )).json();
+  if (!rows.length) { console.log(dim("   nothing pending to approve")); return false; }
+  const owner = process.env.LINE_OWNER_USER_ID;
+  if (!owner) { console.log(dim("   LINE_OWNER_USER_ID unset, cannot auto-approve")); return false; }
+  const body = JSON.stringify({
+    destination: "demo",
+    events: [{ type: "postback", source: { type: "user", userId: owner },
+               postback: { data: `a=approve&id=${rows[0].id}` } }],
+  });
+  const sig = crypto.createHmac("sha256", SECRET).update(body, "utf8").digest("base64");
+  await fetch(`${BASE}/api/line/webhook`, {
+    method: "POST", headers: { "Content-Type": "application/json", "X-Line-Signature": sig }, body,
+  });
+  console.log(dim("   approved"));
+  await sleep(6000);
+  return true;
+}
+
 console.log(bold("\n  AI Bosses — demo runner"));
 console.log(dim(`  ${BASE}   dashboard: ${BASE}/dashboard?key=${DKEY}\n`));
 
 if (!NO_RESET) {
-  await fetch(`${URL_}/rest/v1/agent_roles?id=not.is.null`, { method: "PATCH", headers: H, body: JSON.stringify({ autonomy_level: 0, clean_approvals: 0 }) });
-  await fetch(`${URL_}/rest/v1/decision_log?id=not.is.null`, { method: "DELETE", headers: H });
-  await fetch(`${URL_}/rest/v1/approvals?id=not.is.null`, { method: "DELETE", headers: H });
-  console.log(dim("  reset: every agent back to Level 0, queue and log cleared"));
+  // Delegate to the real reset. This used to DELETE decision_log inline, which
+  // silently undid the append-only guarantee the whole pitch rests on.
+  const { execFileSync } = await import("node:child_process");
+  execFileSync("node", ["--env-file=.env.local", "scripts/demo-reset.mjs"], { stdio: "pipe" });
+  console.log(dim("  reset: every agent back to Level 0, nothing deleted"));
 }
 
 // ---- Act 1: a customer asks, an agent quotes, the owner approves -----------
@@ -86,6 +112,7 @@ await waitForDraft(t, "drafted");
 console.log(bold("\nSAY: ") + "That price is not the model's guess. It read the request, our code picked the volume tier and applied the margin, and the model only wrote the Chinese around it. Landed cost, margin and FX rate are all on the card.");
 console.log(bold("SAY: ") + "And nothing has left the building. It is waiting on me.");
 if (rl) await rl.question(dim("   [approve it on your phone, then enter] "));
+else await approvePending();
 
 // ---- Act 2: the documents disagree ----------------------------------------
 t = now();
@@ -95,6 +122,7 @@ await beat(
 );
 await waitForDraft(t, "drafted");
 if (rl) await rl.question(dim("   [approve, then enter] "));
+else await approvePending();
 
 // ---- Act 3: it warns before anyone asks ------------------------------------
 t = now();
