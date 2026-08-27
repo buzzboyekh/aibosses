@@ -37,8 +37,13 @@ const STATE_COLOR: Record<string, string> = {
   rejected: "#b91c1c",
 };
 
+// Intl rather than a hardcoded format, and no fixed locale: the operator's
+// own settings decide. 24-hour because this is an ops log, not a consumer app.
+const TIME = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+});
 function time(iso: string) {
-  return new Date(iso).toLocaleTimeString("en-GB", { hour12: false });
+  return TIME.format(new Date(iso));
 }
 
 export default async function Dashboard({
@@ -121,11 +126,11 @@ export default async function Dashboard({
               <div style={{ fontSize: 12, color: "#666", margin: "4px 0 10px" }}>{c.goal}</div>
               {mine.map((s) => (
                 <div key={s.seq} style={{ display: "flex", gap: 8, fontSize: 12.5, padding: "3px 0" }}>
-                  <span style={{ width: 16, color: STEP_COLOR[s.status] ?? "#999" }}>
+                  <span style={{ width: 16, color: STEP_COLOR[s.status] ?? "#666" }}>
                     {STEP_MARK[s.status] ?? "?"}
                   </span>
                   <span style={{ width: 150, color: "#555" }}>{s.role_key}</span>
-                  <span style={{ flex: 1, color: "#333" }}>
+                  <span style={{ flex: 1, color: "#333", minWidth: 0, overflowWrap: "break-word" }}>
                     {s.intent}
                     {s.action_type ? null : (
                       <span style={{ color: "#999" }}> · internal, no approval needed</span>
@@ -149,9 +154,12 @@ export default async function Dashboard({
           <div key={a.id} style={cardStyle}>
             <div style={{ fontWeight: 600 }}>{a.title}</div>
             <div style={{ fontSize: 12, color: "#666", margin: "4px 0 8px" }}>
-              {a.action_type} · {time(a.created_at)}
+              {a.action_type} · <span style={{ fontVariantNumeric: "tabular-nums" }}>{time(a.created_at)}</span>
             </div>
-            <div style={{ fontSize: 13, whiteSpace: "pre-wrap", color: "#333" }}>
+            <div style={{
+              fontSize: 13, whiteSpace: "pre-wrap", color: "#333",
+              overflowWrap: "break-word", minWidth: 0,
+            }}>
               {(a.payload?.body ?? "").slice(0, 400)}
             </div>
             {a.payload?.missing?.length ? (
@@ -168,11 +176,20 @@ export default async function Dashboard({
         Append-only. Every action, who took it, and why.
         {earlier > 0 ? ` Showing this session; ${earlier} earlier entries are kept below the last reset.` : ""}
       </p>
+      <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
         <tbody>
+          {sessionLog.length === 0 && (
+            <tr><td style={{ padding: "12px 8px", color: "#666" }} colSpan={4}>
+              Nothing yet this session. Every agent action will appear here.
+            </td></tr>
+          )}
           {sessionLog.map((e: LogRow) => (
             <tr key={e.id} style={{ borderBottom: "1px solid #eee" }}>
-              <td style={{ padding: "7px 8px", color: "#888", whiteSpace: "nowrap", width: 70 }}>
+              <td style={{
+                padding: "7px 8px", color: "#666", whiteSpace: "nowrap", width: 78,
+                fontVariantNumeric: "tabular-nums",
+              }}>
                 {time(e.created_at)}
               </td>
               <td style={{ padding: "7px 8px", whiteSpace: "nowrap", width: 150 }}>{e.actor}</td>
@@ -181,11 +198,14 @@ export default async function Dashboard({
                   {e.action}
                 </span>
               </td>
-              <td style={{ padding: "7px 8px", color: "#555" }}>{e.reason ?? ""}</td>
+              <td style={{ padding: "7px 8px", color: "#555", overflowWrap: "break-word" }}>
+                {e.reason ?? ""}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+      </div>
     </main>
   );
 }
@@ -197,20 +217,21 @@ const STEP_MARK: Record<string, string> = {
 const STEP_COLOR: Record<string, string> = {
   done: "#047857", awaiting_approval: "#b45309", failed: "#b91c1c", running: "#4338ca",
 };
+// All verified >= 4.5:1 on white. #888/#999/#aaa were 3.54/2.85/2.32 and failed.
 const CASE_COLOR: Record<string, string> = {
   running: "#4338ca", waiting: "#b45309", done: "#047857", blocked: "#b91c1c",
 };
 const hintStyle: React.CSSProperties = {
-  textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "#aaa", marginLeft: 10,
+  textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "#666", marginLeft: 10,
 };
 const sectionStyle: React.CSSProperties = {
   fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase",
   color: "#888", margin: "28px 0 10px", fontWeight: 600,
 };
 const cardStyle: React.CSSProperties = {
-  border: "1px solid #e5e5e5", borderRadius: 10, padding: "12px 14px", marginBottom: 10,
+  border: "1px solid #949494", borderRadius: 10, padding: "12px 14px", marginBottom: 10,
 };
 const emptyStyle: React.CSSProperties = {
-  border: "1px dashed #ccc", borderRadius: 10, padding: 18,
-  textAlign: "center", color: "#888", fontSize: 13,
+  border: "1px dashed #949494", borderRadius: 10, padding: 18,
+  textAlign: "center", color: "#666", fontSize: 13,
 };

@@ -60,6 +60,11 @@ export default async function Home() {
         </div>
 
         <h2 style={h2}>The staff</h2>
+        {sorted.length === 0 ? (
+          <p style={{ ...cardBody, color: "#9a9a9a" }}>
+            No agents configured yet.
+          </p>
+        ) : (
         <div style={grid}>
           {sorted.map((r: Role) => (
             <div key={r.key} style={card}>
@@ -78,8 +83,16 @@ export default async function Home() {
               <p style={cardBody}>{WHAT_IT_DOES[r.key] ?? ""}</p>
               <div style={cardMeta}>In logistics: {IN_LOGISTICS[r.key] ?? ""}</div>
               {r.autonomy_level === 0 && (
-                <div style={progressWrap}>
+                <div
+                  style={progressWrap}
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={r.promote_threshold}
+                  aria-valuenow={r.clean_approvals}
+                  aria-label={`${r.name}: ${r.clean_approvals} of ${r.promote_threshold} clean approvals before it can act alone`}
+                >
                   <div
+                    aria-hidden="true"
                     style={{
                       ...progressBar,
                       width: `${Math.min(100, (r.clean_approvals / r.promote_threshold) * 100)}%`,
@@ -93,6 +106,7 @@ export default async function Home() {
             </div>
           ))}
         </div>
+        )}
 
         <h2 style={h2}>How it works</h2>
         <ol style={steps}>
@@ -125,20 +139,24 @@ const wrap: React.CSSProperties = {
 };
 const inner: React.CSSProperties = { maxWidth: 860, margin: "0 auto" };
 const kicker: React.CSSProperties = {
-  fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#737373",
+  fontSize: 11, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9a9a9a",
 };
-const h1: React.CSSProperties = { fontSize: 44, margin: "10px 0 0", letterSpacing: "-0.02em" };
+const h1: React.CSSProperties = {
+  fontSize: 44, margin: "10px 0 0", letterSpacing: "-0.02em", textWrap: "balance",
+};
 const lede: React.CSSProperties = {
   fontSize: 17, lineHeight: 1.6, color: "#a3a3a3", maxWidth: 620, marginTop: 14,
 };
 const stats: React.CSSProperties = {
   display: "flex", gap: 44, margin: "36px 0 8px", flexWrap: "wrap",
 };
-const statValue: React.CSSProperties = { fontSize: 30, fontWeight: 700 };
-const statLabel: React.CSSProperties = { fontSize: 12, color: "#737373", marginTop: 2 };
+const statValue: React.CSSProperties = {
+  fontSize: 30, fontWeight: 700, fontVariantNumeric: "tabular-nums",
+};
+const statLabel: React.CSSProperties = { fontSize: 12, color: "#9a9a9a", marginTop: 2 };
 const h2: React.CSSProperties = {
   fontSize: 12, letterSpacing: "0.1em", textTransform: "uppercase",
-  color: "#737373", margin: "44px 0 14px", fontWeight: 600,
+  color: "#9a9a9a", margin: "44px 0 14px", fontWeight: 600,
 };
 const grid: React.CSSProperties = {
   display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(250px,1fr))", gap: 12,
@@ -149,12 +167,14 @@ const card: React.CSSProperties = {
 const cardHead: React.CSSProperties = {
   display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, flexWrap: "wrap",
 };
-const cardName: React.CSSProperties = { fontWeight: 600, fontSize: 15 };
+const cardName: React.CSSProperties = {
+  fontWeight: 600, fontSize: 15, minWidth: 0, overflowWrap: "break-word",
+};
 const pill: React.CSSProperties = {
   fontSize: 10, padding: "3px 8px", borderRadius: 999, whiteSpace: "nowrap", fontWeight: 600,
 };
 const cardBody: React.CSSProperties = { fontSize: 13.5, color: "#d4d4d4", margin: "10px 0 0", lineHeight: 1.5 };
-const cardMeta: React.CSSProperties = { fontSize: 12, color: "#737373", marginTop: 8 };
+const cardMeta: React.CSSProperties = { fontSize: 12, color: "#9a9a9a", marginTop: 8 };
 const progressWrap: React.CSSProperties = {
   marginTop: 12, height: 3, background: "#262626", borderRadius: 999, position: "relative",
 };
@@ -162,11 +182,12 @@ const progressBar: React.CSSProperties = {
   height: 3, background: "#4f46e5", borderRadius: 999, display: "block",
 };
 const progressLabel: React.CSSProperties = {
-  position: "absolute", top: 8, left: 0, fontSize: 11, color: "#737373",
+  position: "absolute", top: 8, left: 0, fontSize: 11, color: "#9a9a9a",
+  fontVariantNumeric: "tabular-nums",
 };
 const steps: React.CSSProperties = {
   fontSize: 14.5, lineHeight: 1.75, color: "#d4d4d4", paddingLeft: 20, margin: 0,
 };
 const footer: React.CSSProperties = {
-  marginTop: 52, paddingTop: 18, borderTop: "1px solid #262626", fontSize: 12, color: "#525252",
+  marginTop: 52, paddingTop: 18, borderTop: "1px solid #262626", fontSize: 12, color: "#9a9a9a",
 };
