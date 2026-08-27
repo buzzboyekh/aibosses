@@ -5,8 +5,10 @@
 const argv = process.argv.slice(2);
 const bizAt = argv.indexOf("--business");
 const business = bizAt > -1 ? argv[bizAt + 1] : undefined;
+// Guard the -1 case: without --business, `i !== bizAt + 1` reads as `i !== 0`
+// and silently eats the goal.
 const goal = argv
-  .filter((a, i) => !a.startsWith("--") && i !== bizAt + 1)
+  .filter((a, i) => !a.startsWith("--") && (bizAt === -1 || i !== bizAt + 1))
   .join(" ");
 if (!goal) throw new Error('give it a goal: npm run case -- "..."');
 

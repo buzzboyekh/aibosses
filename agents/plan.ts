@@ -43,9 +43,14 @@ const PURPOSE: Record<string, string> = {
  * character assessment out of thin air.
  */
 export const MEMORY_INTENT =
-  "Check what we have on record about each supplier who replied and say " +
-  "whether any of it should change which one we pick. Name the supplier, " +
-  "quote the record, and say plainly where we have no record at all.";
+  "For each supplier who replied, say what we have actually OBSERVED about how " +
+  "they behave, and whether it should change which one we pick. " +
+  "Point to the observation you are relying on. " +
+  "Their profile (what they sell, their MOQ, their terms) is not behaviour: do " +
+  "not treat it as a track record. " +
+  "If we have never observed how a supplier actually performed, say exactly " +
+  "that and move on. Never characterise a supplier as reliable, dependable, " +
+  "good or bad unless you can point to something we observed.";
 
 /**
  * Put the memory step into a sourcing plan, right after the request for

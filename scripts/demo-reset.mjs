@@ -9,7 +9,15 @@
 // and writes a `session_reset` marker. Views show entries since the most
 // recent marker, which gives a clean demo and an intact history.
 //
+// `--forget` additionally clears learned facts. Off by default, and needed only
+// for the memory A/B: learned facts survive every rehearsal, so by the third
+// practice run the "before" half is no longer clean and the comparison means
+// nothing. It deletes only rows in `context_notes` whose source marks them as
+// learned. That is memory, not the audit trail, and the `learned` entries in
+// `decision_log` still record that it happened.
+//
 //   npm run demo:reset
+//   npm run demo:reset -- --forget
 
 const url = process.env.SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -24,6 +32,7 @@ const api = async (path, method, body) => {
   return r;
 };
 
+const forget = process.argv.includes("--forget");
 const businesses = await (await fetch(`${url}/rest/v1/businesses?select=id`, { headers: H })).json();
 
 // 1. Every agent back to draft-only with a clean counter.
@@ -43,6 +52,24 @@ await api("case_steps?status=in.(pending,running,awaiting_approval,awaiting_repl
   status: "skipped", completed_at: now,
 });
 
+// 2b. Only when explicitly asked: forget what was learned about counterparties.
+let forgotten = 0;
+if (forget) {
+  const before = await (await fetch(
+    `${url}/rest/v1/context_notes?select=id&source=like.learned from*`, { headers: H }
+  )).json();
+  forgotten = before.length;
+  if (forgotten) {
+    await api("context_notes?source=like.learned from*", "DELETE");
+  }
+  for (const b of businesses) {
+    await api("decision_log", "POST", {
+      business_id: b.id, actor: "system", action: "session_reset",
+      reason: `forgot ${forgotten} learned facts — deliberate, for a before/after comparison`,
+    });
+  }
+}
+
 // 3. The marker. Everything after this is the new session.
 for (const b of businesses) {
   await api("decision_log", "POST", {
@@ -53,6 +80,8 @@ for (const b of businesses) {
 
 const roles = await (await fetch(`${url}/rest/v1/agent_roles?select=name,autonomy_level,clean_approvals,promote_threshold`, { headers: H })).json();
 const log = await (await fetch(`${url}/rest/v1/decision_log?select=id`, { headers: H })).json();
-console.log("demo reset — nothing deleted");
+console.log(forget
+  ? `demo reset — forgot ${forgotten} learned facts, kept everything else`
+  : "demo reset — nothing deleted");
 for (const r of roles) console.log(`  ${r.name}: level ${r.autonomy_level}, ${r.clean_approvals}/${r.promote_threshold}`);
 console.log(`  decision_log intact: ${log.length} rows (view starts after the new marker)`);

@@ -65,6 +65,24 @@ Do not say AGI. Do not say autonomous. Do not say "for any business".
 > asking. So you do not have to trust it on day one. It earns it, in public,
 > and you can take it back.
 
+**Optional fourth beat — the one that proves the memory claim.**
+Only if the three acts have run fast. Do not run it live, it takes minutes.
+Show the recorded output of `npm run prove`:
+
+> We asked the same question twice, with the same three supplier replies. The
+> only difference was that in between, the system learned one thing: that this
+> supplier was three weeks late last time and did not tell us until we chased.
+>
+> First time, it says plainly that we have never observed how these suppliers
+> perform. Second time, it brings up the delay by name, unprompted.
+>
+> Nothing else changed. That is the memory doing it.
+
+If asked whether the final email changed too: be straight. The memory reached
+the decision and was quoted in it. Whether the outbound draft reads differently
+depends on the case; the claim is that history reached the decision, not that
+the model is deterministic.
+
 ---
 
 ## Close (25 seconds)
