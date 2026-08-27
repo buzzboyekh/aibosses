@@ -118,7 +118,12 @@ export default async function Dashboard({
           return (
             <div key={c.id} style={cardStyle}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
-                <span style={{ fontWeight: 600 }}>{c.title}</span>
+                <a
+                  href={`/case/${c.id}?key=${searchParams?.key ?? ""}`}
+                  style={{ fontWeight: 600, color: "#111" }}
+                >
+                  {c.title}
+                </a>
                 <span style={{ fontSize: 12, color: CASE_COLOR[c.state] ?? "#666", fontWeight: 600 }}>
                   {c.state} · {done}/{mine.length}
                 </span>

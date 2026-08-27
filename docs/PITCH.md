@@ -127,6 +127,11 @@ each has one good answer.
 > The signature on that webhook is verified, the approval is a row in a
 > database, and the log is append-only. If you tap approve twice, the second
 > tap does nothing, and there is a test that proves it.
+>
+> *(then open any job's detail page from the dashboard)* And here is the full
+> record of one job: every step, every draft, the decision on each, and, under
+> "what this agent knew", the exact rules and observations it was given when it
+> acted. Pick any decision and we can reconstruct it.
 
 ### "How do you know the AI is not making things up?"
 
