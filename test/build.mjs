@@ -10,6 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * tsc flattens output only when the file has no local imports. Anything that
@@ -30,7 +31,7 @@ function findEmitted(dir, base) {
   return null;
 }
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const gen = join(root, "test", "gen");
 mkdirSync(gen, { recursive: true });
 
@@ -40,7 +41,10 @@ function compile(src, outName) {
     process.platform === "win32" ? "npx.cmd" : "npx",
     ["--yes", "tsc", src, "--outDir", gen, "--module", "esnext", "--target", "es2022",
      "--moduleResolution", "bundler", "--skipLibCheck"],
-    { cwd: root, stdio: "pipe" }
+    // Windows can only run a .cmd shim through the shell (node's own
+    // .cmd-handling in execFileSync throws EINVAL on some Node versions
+    // otherwise); harmless on POSIX where "npx" is a real executable.
+    { cwd: root, stdio: "pipe", shell: process.platform === "win32" }
   );
   const base = src.split("/").pop().replace(/\.ts$/, ".js");
   const emitted = findEmitted(gen, base);
