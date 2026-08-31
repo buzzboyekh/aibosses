@@ -69,6 +69,17 @@ compile("context/decide.ts", "decide.mjs");
 compile("agents/remember.ts", "remember.mjs");
 compile("agents/plan.ts", "plan.mjs");
 
+// compute.ts genuinely calls into pricing at runtime, so unlike the others its
+// import survives compilation and has to be repointed at the flat copy.
+compile("pools/compute.ts", "pools-compute.mjs");
+{
+  const path = join(root, "test", "pools-compute.mjs");
+  writeFileSync(
+    path,
+    readFileSync(path, "utf8").replace(/['"][^'"]*agents\/pricing(\.js)?['"]/g, '"./pricing.mjs"')
+  );
+}
+
 // The emitted decide.mjs imports ./types.js for types that no longer exist at
 // runtime; strip any leftover relative import of it.
 for (const f of ["decide.mjs", "remember.mjs", "plan.mjs"]) {
@@ -82,4 +93,4 @@ for (const f of ["decide.mjs", "remember.mjs", "plan.mjs"]) {
 }
 
 rmSync(gen, { recursive: true, force: true });
-console.log("built test modules: pricing, line-verify, llm-parse, decide, remember, plan");
+console.log("built test modules: pricing, line-verify, llm-parse, decide, remember, plan, pools-compute");

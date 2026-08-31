@@ -50,6 +50,9 @@ export interface ComputedQuote {
   tier_applied: number;
   below_moq: boolean;
   moq: number;
+  /** The volume the tier was chosen on. Equals `quantity` for a solo order; for
+   *  a pooled one it is the whole pool, which is the entire point. */
+  tier_quantity: number;
 }
 
 export function normaliseSize(raw: string): string {
@@ -62,17 +65,30 @@ export function findLine(list: PriceList, size: string): PriceLine | null {
   return list.lines.find((l) => normaliseSize(l.size) === want) ?? null;
 }
 
-/** Deterministic. No model involved, and every figure is traceable. */
+/** Deterministic. No model involved, and every figure is traceable.
+ *
+ *  `tierQuantity` separates "how much is being bought in total" from "how much
+ *  is this buyer paying for". They are the same for a solo order, so it
+ *  defaults to `quantity` and nothing existing changes. For a pooled order the
+ *  caller passes the whole pool: one kitchen's 15kg is priced at the tier 60kg
+ *  qualifies for, which is the only reason a small kitchen can reach an origin
+ *  price at all.
+ */
 export function computeQuote(
   list: PriceList,
-  req: { size: string; quantity: number; currency?: string | null }
+  req: { size: string; quantity: number; currency?: string | null; tierQuantity?: number }
 ): ComputedQuote | null {
   const line = findLine(list, req.size);
   if (!line || !Number.isFinite(req.quantity) || req.quantity <= 0) return null;
 
-  // Tiers are cheapest-at-volume; pick the best tier the quantity qualifies for.
+  const tierQty =
+    Number.isFinite(req.tierQuantity) && (req.tierQuantity as number) > 0
+      ? (req.tierQuantity as number)
+      : req.quantity;
+
+  // Tiers are cheapest-at-volume; pick the best tier the volume qualifies for.
   const sorted = [...line.tiers].sort((a, b) => a.min_qty - b.min_qty);
-  const qualifying = sorted.filter((t) => req.quantity >= t.min_qty);
+  const qualifying = sorted.filter((t) => tierQty >= t.min_qty);
   const tier = qualifying.length ? qualifying[qualifying.length - 1] : sorted[0];
   const moq = sorted[0].min_qty;
 
@@ -98,8 +114,11 @@ export function computeQuote(
     lead_time_days: line.lead_time_days,
     validity_days: list.validity_days,
     tier_applied: tier.min_qty,
-    below_moq: req.quantity < moq,
+    // The MOQ is a supplier minimum, so it is tested against what the supplier
+    // actually ships: the pool, not one member's share of it.
+    below_moq: tierQty < moq,
     moq,
+    tier_quantity: tierQty,
   };
 }
 
@@ -111,6 +130,9 @@ export function quoteBlock(q: ComputedQuote): string {
     `- Size: ${q.size}`,
     `- Quantity: ${q.quantity}`,
     `- Landed cost: ${money(q.unit_cost, q.cost_currency)} per unit (${q.supplier_ref}, tier from ${q.tier_applied} units)`,
+    q.tier_quantity !== q.quantity
+      ? `- Pooled order: this buyer takes ${q.quantity}, but the tier is the pool's ${q.tier_quantity}. Say plainly that the price comes from the combined order.`
+      : "",
     `- Margin applied: ${q.margin_pct}%`,
     `- UNIT PRICE TO QUOTE: ${money(q.unit_price, q.price_currency)}`,
     `- TOTAL TO QUOTE: ${money(q.total_price, q.price_currency)}`,

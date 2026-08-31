@@ -13,3 +13,4 @@ test/llm-parse.mjs
 test/pricing.mjs
 test/gen/
 test/remember.mjs
+test/pools-compute.mjs
