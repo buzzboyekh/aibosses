@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { uploadDocument, type UploadResult } from "./actions";
 import type { DocType, ExtractedDoc } from "../../documents/types";
+import * as ui from "../ui";
 
 // The stored doc_type values are unchanged (db/schema.sql's check constraint
 // still governs them) — only the labels are in the language of a receiving
@@ -77,21 +78,21 @@ export default function UploadForm() {
 
   return (
     <>
-      <form onSubmit={handleSubmit} style={cardStyle}>
-        <div style={rowStyle}>
-          <label style={labelStyle}>
+      <form onSubmit={handleSubmit} style={ui.card}>
+        <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+          <label style={ui.label}>
             訂單參考碼
             <input
               name="order_ref"
-              placeholder="例如客戶名或訂單號，用來把發票跟裝箱單配成一組"
+              placeholder="例如客戶名或訂單號，用來把送貨單跟請款單配成一組"
               required
               disabled={isPending}
-              style={inputStyle}
+              style={ui.input}
             />
           </label>
-          <label style={labelStyle}>
+          <label style={ui.label}>
             文件類型
-            <select name="doc_type" required disabled={isPending} style={inputStyle}>
+            <select name="doc_type" required disabled={isPending} style={ui.input}>
               <option value="">請選擇</option>
               {DOC_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>
@@ -102,7 +103,7 @@ export default function UploadForm() {
           </label>
         </div>
 
-        <label style={{ ...labelStyle, marginTop: 12 }}>
+        <label style={{ ...ui.label, marginTop: 14 }}>
           檔案（PDF 或圖片）
           <input
             name="file"
@@ -110,11 +111,15 @@ export default function UploadForm() {
             accept="application/pdf,image/*"
             required
             disabled={isPending}
-            style={inputStyle}
+            style={ui.input}
           />
         </label>
 
-        <button type="submit" disabled={isPending} style={isPending ? buttonStylePending : buttonStyle}>
+        <button
+          type="submit"
+          disabled={isPending}
+          style={{ ...(isPending ? ui.buttonBusy : ui.button), marginTop: 16 }}
+        >
           {isPending ? "AI 讀取中…請稍候" : "上傳並讓 AI 讀取"}
         </button>
       </form>
@@ -127,21 +132,21 @@ export default function UploadForm() {
 function ResultBanner({ result }: { result: UploadResult }) {
   switch (result.status) {
     case "validation_error":
-      return <div style={{ ...bannerStyle, ...amberBanner }}>{result.message}</div>;
+      return <div style={ui.bannerWarn}>{result.message}</div>;
 
     case "error":
       return (
-        <div style={{ ...bannerStyle, ...redBanner }}>
+        <div style={ui.bannerBad}>
           {STAGE_LABEL[result.stage] ?? result.stage}失敗：{result.message}
         </div>
       );
 
     case "success_no_pair":
       return (
-        <div style={{ ...bannerStyle, ...neutralBanner }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>已儲存，AI 讀取結果如下</div>
+        <div style={ui.bannerPlain}>
+          <div style={{ fontWeight: 650, marginBottom: 6 }}>已儲存，AI 讀取結果如下</div>
           <Summary doc={result.extracted} />
-          <div style={{ marginTop: 6, color: "#666" }}>
+          <div style={{ marginTop: 8, color: ui.color.muted, fontSize: 14 }}>
             尚無配對文件可比對——上傳同一個訂單參考碼的另一份文件後會自動比對。
           </div>
         </div>
@@ -149,22 +154,36 @@ function ResultBanner({ result }: { result: UploadResult }) {
 
     case "success_pair_matched":
       return (
-        <div style={{ ...bannerStyle, ...greenBanner }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>✓ 兩份文件核對一致</div>
+        <div style={ui.bannerGood}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>✓ 兩份文件核對一致</div>
           <Summary doc={result.extracted} />
         </div>
       );
 
     case "success_pair_mismatched":
+      // The two conflicting figures ARE the demo beat, so they get display
+      // size and the mono face — same treatment as the pooled price on
+      // /pools, and for the same reason: code found this, not a model.
       return (
-        <div style={{ ...bannerStyle, ...amberBanner }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>⚠ 抓到差異</div>
+        <div style={ui.bannerWarn}>
+          <div style={{ fontWeight: 700, marginBottom: 12 }}>⚠ 抓到差異</div>
+
           {result.mismatches.map((m, i) => (
-            <div key={i} style={{ fontSize: 13, margin: "3px 0" }}>
-              {m.field}：請款單 {m.invoiceValue} ／ 送貨單 {m.packingListValue}
+            <div
+              key={i}
+              style={{
+                display: "flex", alignItems: "flex-end", gap: 22, flexWrap: "wrap",
+                padding: "10px 0",
+                borderTop: i === 0 ? "none" : `1px solid ${ui.color.warnLine}`,
+              }}
+            >
+              <div style={{ flex: "1 1 150px", fontSize: 14, paddingBottom: 4 }}>{m.field}</div>
+              <Figure caption="請款單" value={m.invoiceValue} />
+              <Figure caption="送貨單" value={m.packingListValue} />
             </div>
           ))}
-          <div style={{ marginTop: 8, fontWeight: 600 }}>
+
+          <div style={{ marginTop: 12, fontWeight: 650, fontSize: 14 }}>
             {result.agentDrafted
               ? "已送出核准卡到老闆 LINE，等待確認"
               : "差異已記錄，但通知老闆失敗（文件已儲存，不影響資料）"}
@@ -172,6 +191,15 @@ function ResultBanner({ result }: { result: UploadResult }) {
         </div>
       );
   }
+}
+
+function Figure({ caption, value }: { caption: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 12, color: ui.color.muted, marginBottom: 2 }}>{caption}</div>
+      <div style={{ ...ui.figure, fontSize: 26, color: ui.color.warn }}>{value}</div>
+    </div>
+  );
 }
 
 function Summary({ doc }: { doc: ExtractedDoc }) {
@@ -186,38 +214,13 @@ function Summary({ doc }: { doc: ExtractedDoc }) {
   ].filter(Boolean);
 
   return (
-    <div style={{ fontSize: 13 }}>
+    <div style={{ fontSize: 14 }}>
       {parts.length > 0 ? parts.join(" · ") : "（沒有讀到任何欄位）"}
       {doc.missing_fields.length > 0 && (
-        <div style={{ color: "#b45309", marginTop: 4 }}>缺漏欄位：{doc.missing_fields.join("、")}</div>
+        <div style={{ color: ui.color.warn, marginTop: 6 }}>
+          缺漏欄位：{doc.missing_fields.join("、")}
+        </div>
       )}
     </div>
   );
 }
-
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #e5e5e5", borderRadius: 10, padding: "14px 16px", marginBottom: 10,
-};
-const rowStyle: React.CSSProperties = { display: "flex", gap: 12, flexWrap: "wrap" };
-const labelStyle: React.CSSProperties = {
-  display: "flex", flexDirection: "column", gap: 4, fontSize: 12,
-  color: "#555", flex: "1 1 240px",
-};
-const inputStyle: React.CSSProperties = {
-  padding: "8px 10px", fontSize: 14, border: "1px solid #ddd",
-  borderRadius: 6, fontFamily: "inherit",
-};
-const buttonStyle: React.CSSProperties = {
-  marginTop: 14, padding: "8px 16px", fontSize: 14, fontWeight: 600,
-  background: "#111", color: "#fff", border: "none", borderRadius: 6, cursor: "pointer",
-};
-const buttonStylePending: React.CSSProperties = {
-  ...buttonStyle, background: "#999", cursor: "not-allowed",
-};
-const bannerStyle: React.CSSProperties = {
-  marginTop: 10, padding: "10px 14px", borderRadius: 8, fontSize: 14, border: "1px solid",
-};
-const neutralBanner: React.CSSProperties = { background: "#f7f7f7", borderColor: "#e5e5e5", color: "#333" };
-const greenBanner: React.CSSProperties = { background: "#ecfdf5", borderColor: "#a7f3d0", color: "#047857" };
-const amberBanner: React.CSSProperties = { background: "#fffbeb", borderColor: "#fde68a", color: "#b45309" };
-const redBanner: React.CSSProperties = { background: "#fef2f2", borderColor: "#fecaca", color: "#b91c1c" };

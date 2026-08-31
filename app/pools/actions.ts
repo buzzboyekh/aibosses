@@ -12,7 +12,7 @@
 import { revalidatePath } from "next/cache";
 import { serverDb } from "../../context/buildContext";
 import { runAgent } from "../../agents/run";
-import type { PriceList } from "../../agents/pricing";
+import { computeQuote, type PriceList } from "../../agents/pricing";
 import { memberPrices, poolOutcome, poolStatus } from "../../pools/compute";
 import type { DemandPool, MemberPrice, PoolCommitment, PoolStatus } from "../../pools/types";
 
@@ -22,6 +22,11 @@ export interface PoolView {
   pool: DemandPool;
   status: PoolStatus;
   members: MemberPrice[];
+  /** Unit price once the pool reaches target_qty. Shown while it is still
+   *  short, so the page says what joining actually achieves instead of
+   *  implying a discount nobody has earned yet. Null if the item is not on
+   *  the price list. */
+  targetUnitPrice: number | null;
 }
 
 export type JoinResult =
@@ -65,10 +70,16 @@ export async function listOpenPools(): Promise<PoolView[]> {
 
   return (pools as DemandPool[]).map((pool) => {
     const mine = ((commitments ?? []) as PoolCommitment[]).filter((c) => c.pool_id === pool.id);
+    const atTarget = priceList
+      ? computeQuote(priceList, {
+          size: pool.item, quantity: 1, currency: "TWD", tierQuantity: pool.target_qty,
+        })
+      : null;
     return {
       pool,
       status: poolStatus(pool, mine),
       members: priceList ? memberPrices(priceList, pool, mine) : [],
+      targetUnitPrice: atTarget?.unit_price ?? null,
     };
   });
 }

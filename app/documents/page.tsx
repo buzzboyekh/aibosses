@@ -5,6 +5,7 @@
 
 import { listRecentDocuments, type DocumentRow } from "./actions";
 import UploadForm from "./UploadForm";
+import * as ui from "../ui";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -23,21 +24,21 @@ export default async function DocumentsPage() {
   }
 
   return (
-    <main style={{ maxWidth: 900, margin: "0 auto", padding: "32px 20px 64px", color: "#111" }}>
-      <h1 style={{ fontSize: 22, margin: 0 }}>收貨核對 Document Check</h1>
-      <p style={{ color: "#666", marginTop: 4, fontSize: 14 }}>
+    <main style={ui.page}>
+      <h1 style={ui.title}>收貨核對 Document Check</h1>
+      <p style={ui.lede}>
         上傳送貨單跟請款單，AI 自動讀欄位並互相比對；同一個訂單參考碼的兩份文件對不上時，
         會草擬一封通知供應商的訊息送到老闆的 LINE 等待核准。
       </p>
 
-      <h2 style={sectionStyle}>上傳文件</h2>
+      <h2 style={ui.section}>上傳文件</h2>
       <UploadForm />
 
-      <h2 style={sectionStyle}>最近上傳的文件</h2>
+      <h2 style={ui.section}>最近上傳的文件</h2>
       {listError ? (
-        <p style={{ ...emptyStyle, borderColor: "#fecaca", color: "#b91c1c" }}>{listError}</p>
+        <p style={ui.errorNote}>{listError}</p>
       ) : docs.length === 0 ? (
-        <p style={emptyStyle}>還沒有任何文件。上面傳一份試試看。</p>
+        <p style={ui.empty}>還沒有任何文件。上面傳一份試試看。</p>
       ) : (
         docs.map((d) => <DocumentCard key={d.id} doc={d} />)
       )}
@@ -66,35 +67,42 @@ function DocumentCard({ doc }: { doc: DocumentRow }) {
     lineItemCount > 0 && `${lineItemCount} 個品項`,
   ].filter(Boolean);
 
+  const DOC_LABEL: Record<string, string> = {
+    packing_list: "送貨單", commercial_invoice: "請款單",
+    rfq: "詢價單", supplier_quote: "供應商報價", other: "其他",
+  };
+
   return (
-    <div style={cardStyle}>
-      <div style={{ fontWeight: 600 }}>
-        {doc.order_ref ?? "（無訂單參考碼）"} · {doc.doc_type}
+    <div style={ui.card}>
+      <div style={{ fontSize: 17, fontWeight: 650 }}>
+        {doc.order_ref ?? "（無訂單參考碼）"}
+        <span style={{ color: ui.color.muted, fontWeight: 400 }}>
+          {" · "}{DOC_LABEL[doc.doc_type] ?? doc.doc_type}
+        </span>
       </div>
-      <div style={{ fontSize: 12, color: "#666", margin: "4px 0 8px" }}>
+      <div style={{ ...ui.meta, fontSize: 12, margin: "4px 0 10px" }}>
         {new Date(doc.created_at).toLocaleString("zh-TW")} · {doc.storage_path}
       </div>
       {doc.extracted ? (
-        <div style={{ fontSize: 13 }}>
+        <div style={{ fontSize: 14 }}>
           {parts.length > 0 ? parts.join(" · ") : "（沒有讀到任何欄位）"}
           {missing.length > 0 && (
-            <div style={{ color: "#b45309", marginTop: 4 }}>缺漏欄位：{missing.join("、")}</div>
+            <div style={{ color: ui.color.warn, marginTop: 6 }}>缺漏欄位：{missing.join("、")}</div>
           )}
         </div>
       ) : (
-        <div style={{ fontSize: 13, color: "#999" }}>(extracted 是 null)</div>
+        <div style={{ fontSize: 14, color: ui.color.faint }}>（沒有讀取結果）</div>
       )}
       {doc.extracted && (
-        <details style={{ marginTop: 8 }}>
-          <summary style={{ fontSize: 12, color: "#888", cursor: "pointer" }}>原始 JSON</summary>
+        <details style={{ marginTop: 10 }}>
+          <summary style={{ fontSize: 13, color: ui.color.muted, cursor: "pointer" }}>
+            原始 JSON
+          </summary>
           <pre
             style={{
-              fontSize: 12,
-              background: "#f7f7f7",
-              padding: 8,
-              borderRadius: 6,
-              overflowX: "auto",
-              margin: "6px 0 0",
+              fontFamily: ui.font.mono, fontSize: 12, lineHeight: 1.5,
+              background: ui.color.ground, border: `1px solid ${ui.color.line}`,
+              padding: 12, borderRadius: 8, overflowX: "auto", margin: "8px 0 0",
             }}
           >
             {JSON.stringify(doc.extracted, null, 2)}
@@ -104,15 +112,3 @@ function DocumentCard({ doc }: { doc: DocumentRow }) {
     </div>
   );
 }
-
-const sectionStyle: React.CSSProperties = {
-  fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase",
-  color: "#888", margin: "28px 0 10px", fontWeight: 600,
-};
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #e5e5e5", borderRadius: 10, padding: "14px 16px", marginBottom: 10,
-};
-const emptyStyle: React.CSSProperties = {
-  border: "1px dashed #ccc", borderRadius: 10, padding: 18,
-  textAlign: "center", color: "#888", fontSize: 13,
-};
