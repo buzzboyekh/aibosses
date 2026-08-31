@@ -20,22 +20,37 @@ const WHAT_IT_DOES: Record<string, string> = {
   sales_quote: "Drafts anything that leaves the building, in the right language.",
   relationship_memory: "Remembers how every counterparty actually behaves.",
 };
-const IN_LOGISTICS: Record<string, string> = {
-  orchestrator: "assigns the shipment task",
-  doc_check: "invoice vs packing list",
-  ops_po: "carrier rates, supplier quotes, POs",
-  monitoring: "port delay, ETA slip, reroute",
-  sales_quote: "quotes, delay notices, replies",
-  relationship_memory: "which supplier ships late",
+const IN_SOURCING: Record<string, string> = {
+  orchestrator: "assigns the order to a desk",
+  doc_check: "delivery note vs invoice",
+  ops_po: "port and farm prices, comparisons, POs",
+  monitoring: "closed season, typhoon, late truck",
+  sales_quote: "quotes, shortage notices, replies",
+  relationship_memory: "whose grade slips in the wet season",
 };
 const ORDER = ["orchestrator", "sales_quote", "doc_check", "ops_po", "monitoring", "relationship_memory"];
 
 export default async function Home() {
   const db = serverDb();
+
+  // Scope everything to the business being demoed. Without this the page adds
+  // up every business in the database: once a second config was seeded it
+  // showed "12 agents on staff" with each capability listed twice, which is
+  // the kind of thing that is only ever noticed on a projector.
+  const { data: business } = await db
+    .from("businesses")
+    .select("id")
+    .eq("key", process.env.BUSINESS_KEY ?? "demo-import")
+    .maybeSingle();
+  const businessId = business?.id ?? null;
+
+  const scoped = <T,>(q: T): T =>
+    businessId ? (q as { eq: (c: string, v: string) => T }).eq("business_id", businessId) : q;
+
   const [{ data: roles }, { count: decisions }, { count: pending }] = await Promise.all([
-    db.from("agent_roles").select("key,name,action_types,autonomy_level,clean_approvals,promote_threshold"),
-    db.from("decision_log").select("id", { count: "exact", head: true }),
-    db.from("approvals").select("id", { count: "exact", head: true }).eq("state", "pending_approval"),
+    scoped(db.from("agent_roles").select("key,name,action_types,autonomy_level,clean_approvals,promote_threshold")),
+    scoped(db.from("decision_log").select("id", { count: "exact", head: true })),
+    scoped(db.from("approvals").select("id", { count: "exact", head: true }).eq("state", "pending_approval")),
   ]);
 
   const sorted = (roles ?? []).sort(
@@ -48,9 +63,9 @@ export default async function Home() {
         <div style={kicker}>Chill Agent · FUTUREMODE BUILDMODE 2026</div>
         <h1 style={h1}>AI Bosses</h1>
         <p style={lede}>
-          An AI workforce that runs a logistics company&rsquo;s back office. Every desk
-          has an agent, all of them share one brain, and a human approves anything
-          that leaves the building.
+          An AI workforce that buys a kitchen&rsquo;s ingredients straight from the
+          source. Every desk has an agent, all of them share one brain, and a human
+          approves anything that leaves the building.
         </p>
 
         <div style={stats}>
@@ -81,7 +96,7 @@ export default async function Home() {
                 )}
               </div>
               <p style={cardBody}>{WHAT_IT_DOES[r.key] ?? ""}</p>
-              <div style={cardMeta}>In logistics: {IN_LOGISTICS[r.key] ?? ""}</div>
+              <div style={cardMeta}>In sourcing: {IN_SOURCING[r.key] ?? ""}</div>
               {r.autonomy_level === 0 && (
                 <div
                   style={progressWrap}
@@ -110,9 +125,9 @@ export default async function Home() {
 
         <h2 style={h2}>How it works</h2>
         <ol style={steps}>
-          <li><b>A customer messages the company on LINE.</b> Not a portal they have to learn. The channel they already use.</li>
+          <li><b>A kitchen messages the company on LINE.</b> Not a portal they have to learn. The channel they already use.</li>
           <li><b>The right agent picks it up</b>, pulls only the business facts its role is allowed to see, and drafts the reply.</li>
-          <li><b>The owner approves on his phone.</b> Nothing reaches a customer before that, and every step is written to an append-only log.</li>
+          <li><b>The owner approves on his phone.</b> Nothing reaches a client or a supplier before that, and every step is written to an append-only log.</li>
           <li><b>Agents earn autonomy.</b> After a run of clean approvals a capability starts acting alone. One rejection takes it back.</li>
         </ol>
 

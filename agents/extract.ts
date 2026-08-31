@@ -2,6 +2,9 @@
 // prose, no arithmetic: just what did they ask for, so code can price it.
 
 export interface QuoteRequest {
+  /** The line being ordered, matched against price_list[].size in the business
+   *  config. Still called `size` because that is the key the pricing engine
+   *  keys on; for a food business it holds the ingredient name. */
   size: string | null;
   quantity: number | null;
   destination: string | null;
@@ -9,12 +12,14 @@ export interface QuoteRequest {
 }
 
 const SYSTEM = [
-  "Extract what a customer is asking to buy. Reply with JSON only:",
+  "Extract what a kitchen is asking to buy. Reply with JSON only:",
   '{"size": string|null, "quantity": number|null, "destination": string|null, "currency": string|null}',
-  "- size: a tyre size such as 195/65R15, exactly as written, or null",
-  "- quantity: a number of units, or null",
-  "- destination: city or port, or null",
-  "- currency: USD, GBP or TWD if they named one, else null",
+  "- size: the ingredient being ordered, as its common Chinese name and nothing",
+  "  else (石斑魚, 白蝦, 台灣鯛魚片, 高麗菜, 溫體豬後腿肉, 池上米), or null.",
+  "  Drop any grade, cut or packaging words around it.",
+  "- quantity: the number of kilograms or units, or null",
+  "- destination: the restaurant, hotel or delivery address, or null",
+  "- currency: TWD or USD if they named one, else null",
   "Never guess. Anything not stated is null.",
 ].join("\n");
 

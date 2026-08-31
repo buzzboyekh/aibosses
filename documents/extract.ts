@@ -1,24 +1,30 @@
-// Stage 2: read an uploaded invoice or packing list with OpenAI vision and
+// Stage 2: read an uploaded delivery note or invoice with OpenAI vision and
 // return the shape documents/types.ts declares. Never invents a value — any
 // field the model could not read comes back null and is named in
 // missing_fields (hard rule from Kun's spec, echoed in the doc_check prompt
-// in db/seed.sql).
+// the business config seeds).
+//
+// The stored doc_type values are the generic ones in db/schema.sql's check
+// constraint; the labels below are just what we tell the model it is looking
+// at, so a 送貨單 is described to it as a delivery note rather than a
+// shipping packing list.
 
 import type { DocType, ExtractedDoc, LineItem } from "./types";
 
 const MODEL = process.env.OPENAI_EXTRACT_MODEL ?? "gpt-4o";
 
 const DOC_TYPE_LABEL: Record<DocType, string> = {
-  commercial_invoice: "commercial invoice",
-  packing_list: "packing list",
-  rfq: "RFQ",
-  supplier_quote: "supplier quote",
-  other: "trade document",
+  commercial_invoice: "supplier invoice (請款單)",
+  packing_list: "delivery note (送貨單)",
+  rfq: "request for quotation (詢價單)",
+  supplier_quote: "supplier quotation (供應商報價)",
+  other: "supplier document",
 };
 
 function buildPrompt(docType: DocType): string {
   return [
-    `This is a ${DOC_TYPE_LABEL[docType]} from a Taiwan import/export trading company.`,
+    `This is a ${DOC_TYPE_LABEL[docType]} from a Taiwanese food supplier delivering`,
+    `ingredients to a restaurant or hotel kitchen. It may be handwritten.`,
     `Extract these fields. Reply with JSON only, no markdown fence:`,
     `{"seller": string|null, "buyer": string|null, "invoice_number": string|null, "date": string|null,`,
     ` "line_items": [{"description": string|null, "part_number": string|null, "quantity": number|null, "unit_price": number|null, "total": number|null}],`,
@@ -27,7 +33,9 @@ function buildPrompt(docType: DocType): string {
     `Rules:`,
     `- If a field is not on the document, use null. Never guess or estimate a value.`,
     `- List every field you could not find, in your own words, in missing_fields.`,
-    `- line_items is [] if the document has no line-item table (some packing lists only show totals).`,
+    `- line_items is [] if the document has no line-item table (some delivery notes only show totals).`,
+    `- part_number is the supplier's item code for that ingredient if one is printed; otherwise null.`,
+    `- gross_weight is the total weight shown on the document, in the unit printed on it.`,
   ].join("\n");
 }
 

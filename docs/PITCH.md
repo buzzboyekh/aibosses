@@ -13,9 +13,10 @@ shown, not market size claimed.
 
 ## Open (20 seconds)
 
-> A freight forwarder in Taiwan runs on three or four people typing the same
-> shipment into five different systems. Quoting, chasing suppliers, and
-> answering "where is my cargo" at eleven at night.
+> A restaurant in Taiwan buys its fish through two or three middlemen and pays
+> thirty to forty percent over what the port charged that morning. The chef
+> phones four suppliers for a price, writes the order on a notepad, and nobody
+> checks the delivery note against the invoice until the statement arrives.
 >
 > The only lever they have is hiring, and they do not want to use it.
 >
@@ -28,33 +29,37 @@ Do not say AGI. Do not say autonomous. Do not say "for any business".
 ## Demo (about 2 minutes) — Eric drives, you narrate
 
 **Beat 1, the quote.**
-> A customer messages the company on LINE. Not a portal anyone had to learn,
+> A kitchen messages the company on LINE. Not a portal anyone had to learn,
 > the app they already have open.
 
 *(routing appears, then the draft)*
 
 > That went to quoting because our orchestrator read it and decided. Now look
 > at the price. **A language model did not calculate that number.** It read
-> what the customer asked for, our code picked the volume tier and applied the
-> margin, and the model only wrote the Chinese around it. Landed cost, margin
-> and exchange rate are all on the card, so the owner can check the arithmetic
-> in one glance.
+> what the kitchen asked for, our code picked the volume tier and applied the
+> margin, and the model only wrote the Chinese around it. Origin cost, margin
+> and how long the quote is good for are all on the card, so the owner can
+> check the arithmetic in one glance.
+>
+> Three days, not fourteen. Fish reprices every morning, and quoting yesterday's
+> number is how you lose the margin.
 >
 > And it has not gone anywhere. It is sitting on my phone.
 
 *(approve on your phone, live)*
 
 **Beat 2, the documents.**
-> Same inbox, different problem: the invoice and the packing list disagree.
+> Same inbox, different problem: the delivery note and the invoice disagree.
 > This one went somewhere else entirely, to document intelligence, and it
-> quotes both numbers back. A thousand on one, nine hundred and eighty on the
-> other. That gap is what gets caught at a border, or does not.
+> quotes both numbers back. Fifty kilos on one, forty-five on the other. Five
+> kilos of grouper, on one delivery, that nobody catches until the statement.
 
 *(approve)*
 
 **Beat 3, unprompted.**
-> Nobody asked for this one. The shipment slipped eight days at Kaohsiung, and
-> the agent is writing to the customer before the complaint arrives.
+> Nobody asked for this one. A typhoon shut the growing region, the delivery
+> slipped three days, and the agent is writing to the kitchen before the
+> complaint arrives.
 
 **Close on the log.**
 > Every one of those is on the record. Who did it, what they did, and why.
@@ -151,9 +156,13 @@ each has one good answer.
 - **"What is your moat?"** Honest: the model is not it. The moat is the
   relationship history that accumulates, and being the one that fits LINE and
   Taiwanese paperwork. Do not claim a technical moat we do not have.
-- **"How many real customers?"** None yet. Say it straight: the sourcing data
-  in the demo is real, from a real import business one of us runs, and that is
-  what we built it against. Do not imply pilots that do not exist.
+- **"How many real customers?"** None yet, and be careful here. The engine was
+  built and tested against real sourcing data from an import business one of us
+  runs; the food prices in this demo are illustrative, shaped like real
+  wholesale numbers but not scraped from a live market. Say exactly that if
+  asked. Do not imply pilots that do not exist, and do not claim the food
+  figures are live — a judge who knows the market will ask, and the honest
+  answer is stronger than a caught overclaim.
 - **"Does it work for other industries?"** Show the second config, do not
   argue. If it is not built, say "same six capabilities, different config,
   that is next" and move on.

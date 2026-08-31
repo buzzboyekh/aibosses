@@ -20,7 +20,7 @@ export function compareDocuments(invoice: ExtractedDoc, packingList: ExtractedDo
     invoice.packages !== packingList.packages
   ) {
     mismatches.push({
-      field: "包裝箱數 packages",
+      field: "件數 packages",
       invoiceValue: String(invoice.packages),
       packingListValue: String(packingList.packages),
     });
@@ -33,7 +33,7 @@ export function compareDocuments(invoice: ExtractedDoc, packingList: ExtractedDo
     invoice.gross_weight !== packingList.gross_weight
   ) {
     mismatches.push({
-      field: "毛重 gross weight",
+      field: "重量 weight",
       invoiceValue: `${invoice.gross_weight} ${invoice.gross_weight_unit ?? ""}`.trim(),
       packingListValue: `${packingList.gross_weight} ${packingList.gross_weight_unit ?? ""}`.trim(),
     });
@@ -47,7 +47,7 @@ export function compareDocuments(invoice: ExtractedDoc, packingList: ExtractedDo
     const b = packingQty.get(part);
     if (a !== undefined && b !== undefined && a !== b) {
       mismatches.push({
-        field: `數量 quantity（料號 ${part}）`,
+        field: `數量 quantity（品項 ${part}）`,
         invoiceValue: String(a),
         packingListValue: String(b),
       });

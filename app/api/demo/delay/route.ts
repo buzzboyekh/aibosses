@@ -1,6 +1,6 @@
-// Triggers the Monitoring capability: a shipment slips and the agent drafts
-// the customer notice before anyone asks. Used to drive the third act of the
-// demo from a laptop key, so nothing depends on a real carrier feed.
+// Triggers the Monitoring capability: a delivery slips and the agent drafts
+// the client notice before anyone asks. Used to drive the third act of the
+// demo from a laptop key, so nothing depends on a real supplier feed.
 //
 // Guarded by the same key as the dashboard: this creates real approvals and
 // pushes to a real phone, so it must not be open to the internet.
@@ -19,11 +19,11 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}));
-  const reference = String(body.reference ?? "TW-4471");
-  const destination = String(body.destination ?? "Rotterdam");
-  const cause = String(body.cause ?? "port congestion at Kaohsiung");
-  const days = Number(body.days ?? 8);
-  const cargo = String(body.cargo ?? "1000 x 195/65R15");
+  const reference = String(body.reference ?? "KT-0829");
+  const destination = String(body.destination ?? "台北內湖");
+  const cause = String(body.cause ?? "颱風過境，西螺產區停止採收");
+  const days = Number(body.days ?? 3);
+  const cargo = String(body.cargo ?? "50 公斤石斑");
 
   const work = (async () => {
     try {
@@ -32,11 +32,11 @@ export async function POST(req: NextRequest) {
         roleKey: "monitoring",
         actionType: "send_status_update",
         task: [
-          "A shipment we are handling has slipped. Draft the message to the",
-          "customer now, before they ask.",
+          "An order we are handling has slipped. Draft the message to the",
+          "client now, before they ask.",
           "",
-          `Shipment: ${reference}`,
-          `Cargo: ${cargo}`,
+          `Order: ${reference}`,
+          `Goods: ${cargo}`,
           `Destination: ${destination}`,
           `Delay: ${days} days later than planned`,
           `Cause: ${cause}`,
