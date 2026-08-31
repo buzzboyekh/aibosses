@@ -22,7 +22,17 @@ export const color = {
   muted: "#5A6169",
   /** Superseded or de-emphasised — the price you are no longer paying. */
   faint: "#8B939B",
-  line: "#E3E6E8",
+
+  // Two border weights, because they do different jobs. A hairline between
+  // table rows can be faint; the outline of a card cannot. The dashboard had
+  // already been through a contrast pass that pushed its card borders to
+  // #949494 — a near-white edge is invisible once a projector has washed the
+  // image out, and a card with no visible edge is not a card.
+  /** Dividers inside a block: table rows, a rule under a header. */
+  line: "#DDE1E4",
+  /** The outline of a card or an input. Must survive projection. */
+  edge: "#A9B1B7",
+
   surface: "#FFFFFF",
   ground: "#F7F8F9",
 
@@ -70,12 +80,12 @@ export const section: React.CSSProperties = {
 };
 
 export const card: React.CSSProperties = {
-  border: `1px solid ${color.line}`, borderRadius: 12,
+  border: `1px solid ${color.edge}`, borderRadius: 12,
   padding: "18px 20px", marginBottom: 12, background: color.surface,
 };
 
 export const empty: React.CSSProperties = {
-  border: `1px dashed ${color.line}`, borderRadius: 12, padding: 24,
+  border: `1px dashed ${color.edge}`, borderRadius: 12, padding: 24,
   textAlign: "center", color: color.muted, fontSize: 15,
 };
 
@@ -115,7 +125,7 @@ export const label: React.CSSProperties = {
 
 export const input: React.CSSProperties = {
   padding: "9px 11px", fontSize: 15, fontFamily: "inherit",
-  border: `1px solid ${color.line}`, borderRadius: 7, color: color.ink,
+  border: `1px solid ${color.edge}`, borderRadius: 7, color: color.ink,
 };
 
 export const button: React.CSSProperties = {
