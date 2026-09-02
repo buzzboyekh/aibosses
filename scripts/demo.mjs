@@ -102,14 +102,14 @@ if (!NO_RESET) {
   console.log(dim("  reset: every agent back to Level 0, nothing deleted"));
 }
 
-// ---- Act 1: a customer asks, an agent quotes, the owner approves -----------
+// ---- Act 1: a kitchen asks, an agent quotes, the owner approves ------------
 let t = now();
 await beat(
-  "A customer messages the company on LINE. Not a portal they had to learn.",
-  () => customerSays("Hi, price for 1000 pcs 195/65R15 delivered Rotterdam please, in USD. How long is shipping?")
+  "A restaurant messages the company on LINE. Not a portal they had to learn.",
+  () => customerSays("你好，下週三要 50 公斤石斑，送台北內湖。請報價，大概多久能到？")
 );
 await waitForDraft(t, "drafted");
-console.log(bold("\nSAY: ") + "That price is not the model's guess. It read the request, our code picked the volume tier and applied the margin, and the model only wrote the Chinese around it. Landed cost, margin and FX rate are all on the card.");
+console.log(bold("\nSAY: ") + "That price is not the model's guess. It read the request, our code picked the volume tier and applied the margin, and the model only wrote the Chinese around it. Origin cost, margin and how long the quote is good for are all on the card.");
 console.log(bold("SAY: ") + "And nothing has left the building. It is waiting on me.");
 if (rl) await rl.question(dim("   [approve it on your phone, then enter] "));
 else await approvePending();
@@ -117,8 +117,8 @@ else await approvePending();
 // ---- Act 2: the documents disagree ----------------------------------------
 t = now();
 await beat(
-  "Second beat: the paperwork disagrees with itself. This is the one that costs real money at a border.",
-  () => customerSays("Attaching our invoice and packing list for order TW-4471 — invoice says 1000 pcs, packing list says 980 pcs. Please confirm.")
+  "Second beat: the paperwork disagrees with itself. Five kilos of fish nobody notices until the monthly statement.",
+  () => customerSays("附上訂單 KT-0829 的送貨單跟請款單。請款單寫 50 公斤，送貨單寫 45 公斤，麻煩確認一下。")
 );
 await waitForDraft(t, "drafted");
 if (rl) await rl.question(dim("   [approve, then enter] "));
@@ -127,12 +127,12 @@ else await approvePending();
 // ---- Act 3: it warns before anyone asks ------------------------------------
 t = now();
 await beat(
-  "Third beat: nobody asked for this one. The shipment slipped and the agent noticed.",
+  "Third beat: nobody asked for this one. The delivery slipped and the agent noticed.",
   async () => {
     const r = await fetch(`${BASE}/api/demo/delay`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-demo-key": DKEY },
-      body: JSON.stringify({ reference: "TW-4471", destination: "Rotterdam", cause: "port congestion at Kaohsiung", days: 8, cargo: "1000 x 195/65R15" }),
+      body: JSON.stringify({ reference: "KT-0829", destination: "台北內湖", cause: "颱風過境，西螺產區停止採收", days: 3, cargo: "50 公斤石斑" }),
     });
     console.log(dim(`   -> ${r.status}`));
   }

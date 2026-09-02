@@ -10,6 +10,7 @@
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 /**
  * tsc flattens output only when the file has no local imports. Anything that
@@ -30,7 +31,7 @@ function findEmitted(dir, base) {
   return null;
 }
 
-const root = new URL("..", import.meta.url).pathname;
+const root = fileURLToPath(new URL("..", import.meta.url));
 const gen = join(root, "test", "gen");
 mkdirSync(gen, { recursive: true });
 
@@ -40,7 +41,10 @@ function compile(src, outName) {
     process.platform === "win32" ? "npx.cmd" : "npx",
     ["--yes", "tsc", src, "--outDir", gen, "--module", "esnext", "--target", "es2022",
      "--moduleResolution", "bundler", "--skipLibCheck"],
-    { cwd: root, stdio: "pipe" }
+    // Windows can only run a .cmd shim through the shell (node's own
+    // .cmd-handling in execFileSync throws EINVAL on some Node versions
+    // otherwise); harmless on POSIX where "npx" is a real executable.
+    { cwd: root, stdio: "pipe", shell: process.platform === "win32" }
   );
   const base = src.split("/").pop().replace(/\.ts$/, ".js");
   const emitted = findEmitted(gen, base);
@@ -65,6 +69,17 @@ compile("context/decide.ts", "decide.mjs");
 compile("agents/remember.ts", "remember.mjs");
 compile("agents/plan.ts", "plan.mjs");
 
+// compute.ts genuinely calls into pricing at runtime, so unlike the others its
+// import survives compilation and has to be repointed at the flat copy.
+compile("pools/compute.ts", "pools-compute.mjs");
+{
+  const path = join(root, "test", "pools-compute.mjs");
+  writeFileSync(
+    path,
+    readFileSync(path, "utf8").replace(/['"][^'"]*agents\/pricing(\.js)?['"]/g, '"./pricing.mjs"')
+  );
+}
+
 // The emitted decide.mjs imports ./types.js for types that no longer exist at
 // runtime; strip any leftover relative import of it.
 for (const f of ["decide.mjs", "remember.mjs", "plan.mjs"]) {
@@ -78,4 +93,4 @@ for (const f of ["decide.mjs", "remember.mjs", "plan.mjs"]) {
 }
 
 rmSync(gen, { recursive: true, force: true });
-console.log("built test modules: pricing, line-verify, llm-parse, decide, remember, plan");
+console.log("built test modules: pricing, line-verify, llm-parse, decide, remember, plan, pools-compute");

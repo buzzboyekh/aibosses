@@ -4,6 +4,7 @@
 
 import { notFound } from "next/navigation";
 import { serverDb } from "../../context/buildContext";
+import * as ui from "../ui";
 
 export const dynamic = "force-dynamic"; // always live, never a cached snapshot
 export const revalidate = 0;
@@ -29,12 +30,24 @@ type Role = {
   clean_approvals: number; promote_threshold: number;
 };
 
+// Only exceptions and outcomes are coloured. Routine operations (routed,
+// drafted, planned, learned) stay neutral, so a judge scanning the log sees
+// the things that went wrong rather than a wall of colour. delivery_failed
+// used to render the same neutral black as a normal step, which is exactly
+// backwards.
 const STATE_COLOR: Record<string, string> = {
-  pending_approval: "#b45309",
-  approved: "#047857",
-  executed: "#047857",
-  auto_executed: "#4338ca",
-  rejected: "#b91c1c",
+  pending_approval: ui.color.warn,
+  approved: ui.color.good,
+  executed: ui.color.good,
+  delivered: ui.color.good,
+  step_done: ui.color.good,
+  auto_executed: ui.color.active,
+  promoted: ui.color.active,
+  demoted: ui.color.warn,
+  delivery_skipped: ui.color.warn,
+  rejected: ui.color.bad,
+  delivery_failed: ui.color.bad,
+  step_failed: ui.color.bad,
 };
 
 // Intl rather than a hardcoded format, and no fixed locale: the operator's
@@ -58,18 +71,41 @@ export default async function Dashboard({
   if (!expected || searchParams?.key !== expected) notFound();
 
   const db = serverDb();
-  const [{ data: approvals }, { data: log }, { data: roles }, { data: cases }, { data: steps }] = await Promise.all([
+
+  // Everything on this page is scoped to one business. It was not: the queries
+  // asked for every row in each table, so once a second config was seeded the
+  // page listed twelve agents with each capability twice — and, worse than the
+  // cosmetics, mixed another company's approvals and audit trail into this
+  // one's. The company name was hardcoded to the trading company for the same
+  // reason; it comes from the row now.
+  const { data: business } = await db
+    .from("businesses").select("id,name")
+    .eq("key", process.env.BUSINESS_KEY ?? "demo-import").maybeSingle();
+  const businessId = (business?.id as string | undefined) ?? null;
+  if (!businessId) notFound();
+
+  const [{ data: approvals }, { data: log }, { data: roles }, { data: cases }] = await Promise.all([
     db.from("approvals").select("id,title,action_type,state,decided_by,created_at,payload")
+      .eq("business_id", businessId)
       .order("created_at", { ascending: false }).limit(15),
     db.from("decision_log").select("id,actor,action,reason,created_at")
+      .eq("business_id", businessId)
       .order("id", { ascending: false }).limit(60),
     db.from("agent_roles").select("key,name,autonomy_level,clean_approvals,promote_threshold")
+      .eq("business_id", businessId)
       .order("key"),
     db.from("cases").select("id,title,goal,state,kind,updated_at")
+      .eq("business_id", businessId)
       .order("updated_at", { ascending: false }).limit(6),
-    db.from("case_steps").select("case_id,seq,role_key,action_type,intent,status")
-      .order("seq"),
   ]);
+
+  // case_steps has no business_id of its own, so it is scoped through the
+  // cases just fetched — which also stops this from growing unbounded.
+  const caseIds = ((cases ?? []) as CaseRow[]).map((c) => c.id);
+  const { data: steps } = caseIds.length
+    ? await db.from("case_steps").select("case_id,seq,role_key,action_type,intent,status")
+        .in("case_id", caseIds).order("seq")
+    : { data: [] as StepRow[] };
 
   const pending = (approvals ?? []).filter((a: Approval) => a.state === "pending_approval");
 
@@ -81,34 +117,43 @@ export default async function Dashboard({
   const earlier = markerAt === -1 ? 0 : allLog.length - markerAt - 1;
 
   return (
-    <main style={{ maxWidth: 1000, margin: "0 auto", padding: "32px 20px 64px", color: "#111" }}>
-      <h1 style={{ fontSize: 22, margin: 0 }}>Mission Control</h1>
-      <p style={{ color: "#666", marginTop: 4, fontSize: 14 }}>
-        Demo Import Trading Co. · {pending.length} waiting on you
+    <main style={{ ...ui.page, maxWidth: 1000 }}>
+      <h1 style={ui.title}>Mission Control</h1>
+      <p style={{ ...ui.lede, maxWidth: "none" }}>
+        {business?.name ?? "—"} ·{" "}
+        <span style={{ color: pending.length ? ui.color.warn : ui.color.muted, fontWeight: 650 }}>
+          {pending.length} waiting on you
+        </span>
       </p>
 
-      <h2 style={sectionStyle}>The workforce</h2>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 10 }}>
+      <h2 style={ui.section}>The workforce</h2>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(230px,1fr))", gap: 10 }}>
         {(roles ?? []).map((r: Role) => (
-          <div key={r.key} style={cardStyle}>
-            <div style={{ fontWeight: 600, fontSize: 14 }}>{r.name}</div>
-            <div style={{ fontSize: 12, color: "#666", marginTop: 4 }}>
+          <div key={r.key} style={{ ...ui.card, padding: "14px 16px" }}>
+            <div style={{ fontWeight: 650, fontSize: 15 }}>{r.name}</div>
+            <div style={{ ...ui.meta, marginTop: 5 }}>
               {r.autonomy_level === 1 ? (
-                <span style={{ color: "#4338ca", fontWeight: 600 }}>Level 1 · acts alone</span>
+                <span style={{ color: ui.color.active, fontWeight: 650 }}>Level 1 · acts alone</span>
               ) : (
-                <>Level 0 · drafts only · {r.clean_approvals}/{r.promote_threshold} to promotion</>
+                <>
+                  Level 0 · drafts only ·{" "}
+                  <span style={{ ...ui.figureSm, fontSize: 13 }}>
+                    {r.clean_approvals}/{r.promote_threshold}
+                  </span>{" "}
+                  to promotion
+                </>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      <h2 style={sectionStyle}>
+      <h2 style={ui.section}>
         Jobs
-        <span style={{ ...hintStyle }}>work that takes more than one step</span>
+        <span style={hintStyle}>work that takes more than one step</span>
       </h2>
       {(cases ?? []).length === 0 ? (
-        <p style={emptyStyle}>
+        <p style={ui.empty}>
           No jobs open. Give the company a goal and it will plan the steps itself.
         </p>
       ) : (
@@ -116,33 +161,35 @@ export default async function Dashboard({
           const mine = ((steps ?? []) as StepRow[]).filter((s) => s.case_id === c.id);
           const done = mine.filter((s) => s.status === "done").length;
           return (
-            <div key={c.id} style={cardStyle}>
-              <div style={{ display: "flex", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+            <div key={c.id} style={ui.card}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <a
                   href={`/case/${c.id}?key=${searchParams?.key ?? ""}`}
-                  style={{ fontWeight: 600, color: "#111" }}
+                  style={{ fontWeight: 650, fontSize: 16, color: ui.color.ink }}
                 >
                   {c.title}
                 </a>
-                <span style={{ fontSize: 12, color: CASE_COLOR[c.state] ?? "#666", fontWeight: 600 }}>
-                  {c.state} · {done}/{mine.length}
+                <span style={{ fontSize: 13, color: CASE_COLOR[c.state] ?? ui.color.muted, fontWeight: 650 }}>
+                  {c.state} · <span style={{ ...ui.figureSm, fontSize: 13 }}>{done}/{mine.length}</span>
                 </span>
               </div>
-              <div style={{ fontSize: 12, color: "#666", margin: "4px 0 10px" }}>{c.goal}</div>
+              <div style={{ ...ui.meta, margin: "5px 0 12px" }}>{c.goal}</div>
               {mine.map((s) => (
-                <div key={s.seq} style={{ display: "flex", gap: 8, fontSize: 12.5, padding: "3px 0" }}>
-                  <span style={{ width: 16, color: STEP_COLOR[s.status] ?? "#666" }}>
+                <div key={s.seq} style={{ display: "flex", gap: 10, fontSize: 14, padding: "4px 0" }}>
+                  <span style={{ width: 16, color: STEP_COLOR[s.status] ?? ui.color.muted }}>
                     {STEP_MARK[s.status] ?? "?"}
                   </span>
-                  <span style={{ width: 150, color: "#555" }}>{s.role_key}</span>
-                  <span style={{ flex: 1, color: "#333", minWidth: 0, overflowWrap: "break-word" }}>
+                  <span style={{ width: 160, color: ui.color.muted }}>{s.role_key}</span>
+                  <span style={{ flex: 1, color: ui.color.ink, minWidth: 0, overflowWrap: "break-word" }}>
                     {s.intent}
                     {s.action_type ? null : (
-                      <span style={{ color: "#999" }}> · internal, no approval needed</span>
+                      <span style={{ color: ui.color.faint }}> · internal, no approval needed</span>
                     )}
                   </span>
                   {s.status === "awaiting_approval" && (
-                    <span style={{ color: "#b45309", whiteSpace: "nowrap" }}>waiting on you</span>
+                    <span style={{ color: ui.color.warn, whiteSpace: "nowrap", fontWeight: 650 }}>
+                      waiting on you
+                    </span>
                   )}
                 </div>
               ))}
@@ -151,24 +198,25 @@ export default async function Dashboard({
         })
       )}
 
-      <h2 style={sectionStyle}>Approval queue</h2>
+      <h2 style={ui.section}>Approval queue</h2>
       {pending.length === 0 ? (
-        <p style={emptyStyle}>Nothing waiting. Drafts land here before anything is sent.</p>
+        <p style={ui.empty}>Nothing waiting. Drafts land here before anything is sent.</p>
       ) : (
         pending.map((a: Approval) => (
-          <div key={a.id} style={cardStyle}>
-            <div style={{ fontWeight: 600 }}>{a.title}</div>
-            <div style={{ fontSize: 12, color: "#666", margin: "4px 0 8px" }}>
-              {a.action_type} · <span style={{ fontVariantNumeric: "tabular-nums" }}>{time(a.created_at)}</span>
+          <div key={a.id} style={{ ...ui.card, borderLeft: `4px solid ${ui.color.warn}` }}>
+            <div style={{ fontWeight: 650, fontSize: 16 }}>{a.title}</div>
+            <div style={{ ...ui.meta, margin: "5px 0 10px" }}>
+              {a.action_type} ·{" "}
+              <span style={{ ...ui.figureSm, fontSize: 13 }}>{time(a.created_at)}</span>
             </div>
             <div style={{
-              fontSize: 13, whiteSpace: "pre-wrap", color: "#333",
+              ...ui.body, whiteSpace: "pre-wrap", color: ui.color.ink,
               overflowWrap: "break-word", minWidth: 0,
             }}>
               {(a.payload?.body ?? "").slice(0, 400)}
             </div>
             {a.payload?.missing?.length ? (
-              <div style={{ fontSize: 12, color: "#b45309", marginTop: 8 }}>
+              <div style={{ fontSize: 13, color: ui.color.warn, marginTop: 10 }}>
                 Agent flagged missing: {a.payload.missing.join("; ")}
               </div>
             ) : null}
@@ -176,34 +224,46 @@ export default async function Dashboard({
         ))
       )}
 
-      <h2 style={sectionStyle}>Decision log</h2>
-      <p style={{ fontSize: 12, color: "#666", marginTop: -6 }}>
+      {/* The close of the pitch is this table, so it gets the weight. The
+          machine's own record — when, who, what — is set in mono; `reason` is
+          the agent's prose and stays in the UI face, which keeps the two kinds
+          of claim visually separate. */}
+      <h2 style={ui.section}>Decision log</h2>
+      <p style={{ ...ui.meta, marginTop: -6 }}>
         Append-only. Every action, who took it, and why.
         {earlier > 0 ? ` Showing this session; ${earlier} earlier entries are kept below the last reset.` : ""}
       </p>
       <div style={{ overflowX: "auto" }}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
         <tbody>
           {sessionLog.length === 0 && (
-            <tr><td style={{ padding: "12px 8px", color: "#666" }} colSpan={4}>
+            <tr><td style={{ padding: "14px 8px", color: ui.color.muted }} colSpan={4}>
               Nothing yet this session. Every agent action will appear here.
             </td></tr>
           )}
           {sessionLog.map((e: LogRow) => (
-            <tr key={e.id} style={{ borderBottom: "1px solid #eee" }}>
+            <tr key={e.id} style={{ borderBottom: `1px solid ${ui.color.line}` }}>
               <td style={{
-                padding: "7px 8px", color: "#666", whiteSpace: "nowrap", width: 78,
-                fontVariantNumeric: "tabular-nums",
+                ...ui.figureSm, fontSize: 13, padding: "9px 8px",
+                color: ui.color.muted, whiteSpace: "nowrap", width: 82,
               }}>
                 {time(e.created_at)}
               </td>
-              <td style={{ padding: "7px 8px", whiteSpace: "nowrap", width: 150 }}>{e.actor}</td>
-              <td style={{ padding: "7px 8px", width: 110 }}>
-                <span style={{ color: STATE_COLOR[e.action] ?? "#333", fontWeight: 600 }}>
+              <td style={{
+                ...ui.figureSm, fontSize: 13, padding: "9px 8px",
+                whiteSpace: "nowrap", width: 168,
+              }}>
+                {e.actor}
+              </td>
+              <td style={{ padding: "9px 8px", width: 120 }}>
+                <span style={{
+                  ...ui.figureSm, fontSize: 13, fontWeight: 650,
+                  color: STATE_COLOR[e.action] ?? ui.color.ink,
+                }}>
                   {e.action}
                 </span>
               </td>
-              <td style={{ padding: "7px 8px", color: "#555", overflowWrap: "break-word" }}>
+              <td style={{ padding: "9px 8px", color: ui.color.muted, overflowWrap: "break-word" }}>
                 {e.reason ?? ""}
               </td>
             </tr>
@@ -219,24 +279,18 @@ const STEP_MARK: Record<string, string> = {
   done: "✓", running: "•", awaiting_approval: "⏸", awaiting_reply: "⏳",
   pending: "·", failed: "✕", skipped: "–",
 };
+// Semantics come from app/ui.ts now, which carries forward the contrast pass
+// this file had already been through: every one is >= 4.5:1 on white, and
+// #888/#999/#aaa were 3.54/2.85/2.32 and failed it.
 const STEP_COLOR: Record<string, string> = {
-  done: "#047857", awaiting_approval: "#b45309", failed: "#b91c1c", running: "#4338ca",
+  done: ui.color.good, awaiting_approval: ui.color.warn,
+  failed: ui.color.bad, running: ui.color.active,
 };
-// All verified >= 4.5:1 on white. #888/#999/#aaa were 3.54/2.85/2.32 and failed.
 const CASE_COLOR: Record<string, string> = {
-  running: "#4338ca", waiting: "#b45309", done: "#047857", blocked: "#b91c1c",
+  running: ui.color.active, waiting: ui.color.warn,
+  done: ui.color.good, blocked: ui.color.bad,
 };
 const hintStyle: React.CSSProperties = {
-  textTransform: "none", letterSpacing: 0, fontWeight: 400, color: "#666", marginLeft: 10,
-};
-const sectionStyle: React.CSSProperties = {
-  fontSize: 12, letterSpacing: "0.08em", textTransform: "uppercase",
-  color: "#888", margin: "28px 0 10px", fontWeight: 600,
-};
-const cardStyle: React.CSSProperties = {
-  border: "1px solid #949494", borderRadius: 10, padding: "12px 14px", marginBottom: 10,
-};
-const emptyStyle: React.CSSProperties = {
-  border: "1px dashed #949494", borderRadius: 10, padding: 18,
-  textAlign: "center", color: "#666", fontSize: 13,
+  textTransform: "none", letterSpacing: 0, fontWeight: 400,
+  color: ui.color.muted, marginLeft: 10,
 };

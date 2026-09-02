@@ -1,6 +1,6 @@
 // Fires the Monitoring capability on the deployed app. One command on stage.
 //   npm run demo:delay
-//   npm run demo:delay -- --days 12 --cause "typhoon closure at Kaohsiung"
+//   npm run demo:delay -- --days 5 --cause "石斑休漁期，契作魚塭排單到下週"
 
 const arg = (name, fallback) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -15,11 +15,11 @@ const res = await fetch(`${base}/api/demo/delay`, {
   method: "POST",
   headers: { "Content-Type": "application/json", "x-demo-key": key },
   body: JSON.stringify({
-    reference: arg("ref", "TW-4471"),
-    destination: arg("to", "Rotterdam"),
-    cause: arg("cause", "port congestion at Kaohsiung"),
-    days: Number(arg("days", "8")),
-    cargo: arg("cargo", "1000 x 195/65R15"),
+    reference: arg("ref", "KT-0829"),
+    destination: arg("to", "台北內湖"),
+    cause: arg("cause", "颱風過境，西螺產區停止採收"),
+    days: Number(arg("days", "3")),
+    cargo: arg("cargo", "50 公斤石斑"),
   }),
 });
 console.log(res.status, await res.text());
