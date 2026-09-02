@@ -3,14 +3,25 @@
 // compared deterministically (documents/compare.ts) and, if real, handed to
 // the doc_check agent to draft a customer notice for the owner to approve.
 
+import { notFound } from "next/navigation";
 import { listRecentDocuments, type DocumentRow } from "./actions";
 import UploadForm from "./UploadForm";
+import { hasDemoKey } from "../demoGuard";
 import * as ui from "../ui";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function DocumentsPage() {
+export default async function DocumentsPage({
+  searchParams,
+}: {
+  searchParams: { key?: string };
+}) {
+  // Every upload spends an OpenAI vision call, so this page is operator-only,
+  // gated by the same key as /dashboard.
+  if (!hasDemoKey(searchParams?.key)) notFound();
+  const demoKey = searchParams.key as string;
+
   // Loading the recent-documents list is a read, not something the operator
   // triggers — a failure here (a DB blip, a schema mismatch) must not take
   // down the whole page, including the upload form above it, which doesn't
@@ -32,7 +43,7 @@ export default async function DocumentsPage() {
       </p>
 
       <h2 style={ui.section}>上傳文件</h2>
-      <UploadForm />
+      <UploadForm demoKey={demoKey} />
 
       <h2 style={ui.section}>最近上傳的文件</h2>
       {listError ? (

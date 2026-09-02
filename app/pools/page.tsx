@@ -6,14 +6,25 @@
 // what a kitchen would pay alone, and what it pays because three others wanted
 // the same fish on the same day.
 
+import { notFound } from "next/navigation";
 import { listOpenPools, type PoolView } from "./actions";
 import PoolCard from "./PoolCard";
+import { hasDemoKey } from "../demoGuard";
 import * as ui from "../ui";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export default async function PoolsPage() {
+export default async function PoolsPage({
+  searchParams,
+}: {
+  searchParams: { key?: string };
+}) {
+  // A join can fill a pool, which fires a purchase order and spends a LINE
+  // push. Operator-only, same key as /dashboard.
+  if (!hasDemoKey(searchParams?.key)) notFound();
+  const demoKey = searchParams.key as string;
+
   // A failure loading the list must not take down the page — the same reason
   // /documents wraps its own list read.
   let pools: PoolView[] = [];
@@ -38,7 +49,7 @@ export default async function PoolsPage() {
         ) : pools.length === 0 ? (
           <p style={ui.empty}>目前沒有進行中的併單。</p>
         ) : (
-          pools.map((v) => <PoolCard key={v.pool.id} view={v} />)
+          pools.map((v) => <PoolCard key={v.pool.id} view={v} demoKey={demoKey} />)
         )}
       </div>
     </main>

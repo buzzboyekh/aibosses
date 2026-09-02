@@ -26,10 +26,13 @@ const warn = (name, detail, fix) => results.push({ level: "warn", name, detail, 
 const bad = (name, detail, fix) => results.push({ level: "bad", name, detail, fix });
 
 // --- 1. environment ---------------------------------------------------------
+// BUSINESS_KEY is in here because leaving it unset does not fail loudly: the
+// app falls back to one business, the seed scripts write to another, and the
+// first anyone knows is an empty page on the projector.
 const NEEDED = [
   "SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY",
   "LINE_CHANNEL_SECRET", "LINE_CHANNEL_ACCESS_TOKEN", "LINE_OWNER_USER_ID",
-  "DASHBOARD_KEY",
+  "DASHBOARD_KEY", "BUSINESS_KEY",
 ];
 const missing = NEEDED.filter((k) => !process.env[k]);
 if (missing.length) {
@@ -147,26 +150,61 @@ if (!process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) {
 if (SB && SKEY) {
   const q = (p) => fetch(`${SB}/rest/v1/${p}`, { headers: H }).then((r) => r.json());
   try {
-    const roles = await q("agent_roles?select=name,autonomy_level,clean_approvals&business_id=not.is.null");
-    const promoted = roles.filter((r) => r.autonomy_level !== 0);
-    // Three clean rehearsals promote a role, and a promoted role stops sending
-    // the approval card. The demo then has no second act and gives no error.
-    if (promoted.length) bad("agent autonomy",
-      `${promoted.map((r) => r.name).join(", ")} already promoted`,
-      "npm run demo:reset — otherwise the approval card will not appear");
-    else ok("agent autonomy", `all ${roles.length} agents at Level 0`);
+    // Everything below is scoped to the ONE business the demo will show.
+    // Unscoped, these counted every business in the database, so a second
+    // config turned "all 6 agents at Level 0" into "all 12" and a promoted
+    // agent in the business nobody is demoing would have blocked a good run.
+    const bkey = process.env.BUSINESS_KEY;
+    const [biz] = bkey ? await q(`businesses?select=id,name,config&key=eq.${bkey}`) : [];
+    if (!biz) {
+      bad("business", `BUSINESS_KEY=${bkey ?? "(unset)"} matches no row`,
+        "set BUSINESS_KEY to a seeded business — the pages read this and will otherwise be empty");
+    } else {
+      ok("business", `${bkey} — ${biz.name}`);
+      const scope = `business_id=eq.${biz.id}`;
 
-    const pending = await q("approvals?select=id&state=eq.pending_approval");
-    if (pending.length > 2) warn("approval queue", `${pending.length} left over`,
-      "npm run demo:reset, so the queue on screen is only what you just did");
-    else ok("approval queue", `${pending.length} pending`);
+      const roles = await q(`agent_roles?select=name,autonomy_level,clean_approvals&${scope}`);
+      const promoted = roles.filter((r) => r.autonomy_level !== 0);
+      // Three clean rehearsals promote a role, and a promoted role stops sending
+      // the approval card. The demo then has no second act and gives no error.
+      if (promoted.length) bad("agent autonomy",
+        `${promoted.map((r) => r.name).join(", ")} already promoted`,
+        "npm run demo:reset — otherwise the approval card will not appear");
+      else ok("agent autonomy", `all ${roles.length} agents at Level 0`);
 
-    const notes = await q("context_notes?select=content,source");
-    const core = notes.filter((n) => !String(n.source ?? "").startsWith("learned from"));
-    const hasMargin = core.some((n) => n.content.includes("12 percent"));
-    if (!hasMargin) bad("business rules", "the margin rule is not reaching the agents",
-      "reseed: run db/seed.sql, or check the context budget in buildContext.ts");
-    else ok("business rules", `${core.length} core rules present, margin rule reachable`);
+      const pending = await q(`approvals?select=id&state=eq.pending_approval&${scope}`);
+      if (pending.length > 2) warn("approval queue", `${pending.length} left over`,
+        "npm run demo:reset, so the queue on screen is only what you just did");
+      else ok("approval queue", `${pending.length} pending`);
+
+      // The margin figure comes from this business's own price list rather than
+      // a hardcoded "12 percent", which was the tyre number and would have
+      // reported a false failure the moment the config changed industry.
+      const notes = await q(`context_notes?select=content,source&${scope}`);
+      const core = notes.filter((n) => !String(n.source ?? "").startsWith("learned from"));
+      const marginPct = biz.config?.price_list?.margin_pct;
+      const hasMargin = marginPct === undefined
+        ? core.some((n) => /\d+ percent/.test(n.content))
+        : core.some((n) => n.content.includes(`${marginPct} percent`));
+      if (!hasMargin) bad("business rules",
+        `the margin rule (${marginPct ?? "?"}%) is not reaching the agents`,
+        "reseed this business, or check the context budget in buildContext.ts");
+      else ok("business rules", `${core.length} core rules present, margin rule reachable`);
+
+      // The pooling page is act one of the new demo, and an unseeded pool is
+      // an empty screen rather than an error — exactly the failure that is
+      // invisible until you are standing in front of it.
+      const pools = await q(`demand_pools?select=id,item,state&${scope}&state=eq.open`);
+      if (Array.isArray(pools) && pools.length) {
+        ok("demand pools", `${pools.length} open (${pools.map((p) => p.item).join(", ")})`);
+      } else if (Array.isArray(pools)) {
+        warn("demand pools", "none open — /pools will be empty",
+          "node --env-file=.env.local scripts/seed-pools.mjs");
+      } else {
+        warn("demand pools", "table missing — migration 004 not applied",
+          "run db/migrations/004_demand_pools.sql in the Supabase SQL editor");
+      }
+    }
   } catch (err) {
     bad("database", String(err).slice(0, 80), "check SUPABASE_URL and the service key");
   }

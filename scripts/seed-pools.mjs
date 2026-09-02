@@ -13,7 +13,17 @@ const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 if (!url || !key) throw new Error("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing");
 const H = { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json", Prefer: "return=representation" };
 
-const KEY = process.env.BUSINESS_KEY ?? "demo-food";
+// No default. This used to fall back to "demo-food" while the app falls back
+// to "demo-import", so with the variable unset the pool was seeded into a
+// business the page never reads — and the only symptom was an empty screen.
+// Refusing is better than guessing differently from the thing that reads it.
+const KEY = process.env.BUSINESS_KEY;
+if (!KEY) {
+  throw new Error(
+    "BUSINESS_KEY is unset. Set it to the business the app serves (the pages read " +
+    "the same variable), otherwise this seeds a pool nothing will display."
+  );
+}
 const RESET = process.argv.includes("--reset");
 
 const get = async (path) => (await fetch(`${url}/rest/v1/${path}`, { headers: H })).json();
@@ -33,18 +43,26 @@ const ITEM = "石斑魚";
 const DELIVERY = day(4);
 const CLOSES = new Date(Date.now() + 2 * 86400000).toISOString();
 
-const open = await get(
-  `demand_pools?select=id&business_id=eq.${business.id}&item=eq.${encodeURIComponent(ITEM)}&state=eq.open`
+// `filled` counts as existing, not just `open`. A pool that filled during a
+// rehearsal still renders on /pools, so ignoring it here is how the stage ends
+// up with two cards for the same fish. Commitments go with it via ON DELETE
+// CASCADE — these are demo fixtures, not the audit trail.
+const existing = await get(
+  `demand_pools?select=id,state&business_id=eq.${business.id}` +
+  `&item=eq.${encodeURIComponent(ITEM)}&state=in.(open,filled)`
 );
-if (open.length && !RESET) {
-  console.log(`pool already open for ${ITEM} (${open[0].id}). Use --reset to rebuild it.`);
+if (existing.length && !RESET) {
+  console.log(
+    `${existing.length} pool(s) already live for ${ITEM} ` +
+    `(${existing.map((p) => p.state).join(", ")}). Use --reset to rebuild.`
+  );
   process.exit(0);
 }
-if (open.length && RESET) {
-  for (const p of open) {
+if (existing.length && RESET) {
+  for (const p of existing) {
     await fetch(`${url}/rest/v1/demand_pools?id=eq.${p.id}`, { method: "DELETE", headers: H });
   }
-  console.log(`removed ${open.length} existing pool(s)`);
+  console.log(`removed ${existing.length} existing pool(s)`);
 }
 
 // target_qty is the tier we are chasing, moq is the supplier's own floor —

@@ -15,8 +15,19 @@ import { runAgent } from "../../agents/run";
 import { computeQuote, type PriceList } from "../../agents/pricing";
 import { memberPrices, poolOutcome, poolStatus } from "../../pools/compute";
 import type { DemandPool, MemberPrice, PoolCommitment, PoolStatus } from "../../pools/types";
+import { formHasDemoKey } from "../demoGuard";
 
 const BUSINESS_KEY = process.env.BUSINESS_KEY ?? "demo-import";
+
+// A filled pool ends in a LINE push, and the push quota is finite.
+//
+// Buyer names deliberately never reach the purchase-order prompt — the draft
+// tells the supplier a total, not who ordered what. The item name does, and
+// only the seed script writes it today, but fencing it costs nothing and keeps
+// that true if pools ever become user-creatable. Same treatment as the
+// customer text in line/inquiry.ts.
+const FENCE = '"' + '""';
+const asData = (s: string, max = 60) => s.slice(0, max).split(FENCE).join("'''");
 
 export interface PoolView {
   pool: DemandPool;
@@ -93,14 +104,24 @@ export async function listOpenPools(): Promise<PoolView[]> {
  */
 export async function joinPool(formData: FormData): Promise<JoinResult> {
   try {
+    if (!formHasDemoKey(formData)) {
+      return { status: "validation_error", message: "沒有操作權限：這個頁面要帶 demo key 才能用" };
+    }
+
     const poolId = (formData.get("pool_id") as string | null)?.trim();
     const buyerRef = (formData.get("buyer_ref") as string | null)?.trim();
     const quantity = Number(formData.get("quantity"));
 
     if (!poolId) return { status: "validation_error", message: "缺少併單編號" };
     if (!buyerRef) return { status: "validation_error", message: "請填店名" };
+    if (buyerRef.length > 60) return { status: "validation_error", message: "店名太長，60 字以內" };
     if (!Number.isFinite(quantity) || quantity <= 0) {
       return { status: "validation_error", message: "請填一個大於 0 的數量" };
+    }
+    // An unbounded quantity fills any pool in one request, which fires the
+    // purchase order and spends a LINE push.
+    if (quantity > 10000) {
+      return { status: "validation_error", message: "數量看起來不合理，請確認" };
     }
 
     const db = serverDb();
@@ -115,6 +136,12 @@ export async function joinPool(formData: FormData): Promise<JoinResult> {
     if (poolErr || !pool) return { status: "error", message: "找不到這筆併單" };
     if (pool.state !== "open") {
       return { status: "validation_error", message: "這筆併單已經結單了" };
+    }
+    // The deadline is part of the offer. Without this a pool stays joinable
+    // forever as long as nothing has closed it, and the conditional price we
+    // quoted ("this rate if we reach 50kg by Tuesday") stops being true.
+    if (new Date(pool.closes_at) <= new Date()) {
+      return { status: "validation_error", message: "這筆併單已經過了截止時間" };
     }
 
     // upsert so a kitchen changing its mind updates its line rather than
@@ -133,12 +160,28 @@ export async function joinPool(formData: FormData): Promise<JoinResult> {
 
     const outcome = poolOutcome(pool as DemandPool, all, new Date());
     let agentDrafted = false;
+    let iFilledIt = false;
 
     if (outcome === "filled") {
-      await db.from("demand_pools")
+      // Guarded update, the same shape as context/decide.ts's double-tap
+      // guard: the row only moves if it is still `open`, and we act on the
+      // returned rows rather than assuming. Two kitchens joining at the same
+      // moment both compute "filled", and without this both would go on to
+      // draft a purchase order — two POs to the same supplier for one order.
+      const { data: won, error: claimErr } = await db
+        .from("demand_pools")
         .update({ state: "filled", updated_at: new Date().toISOString() })
-        .eq("id", poolId);
-      agentDrafted = await draftPurchaseOrder(db, pool as DemandPool, all, priceList);
+        .eq("id", poolId)
+        .eq("state", "open")
+        .select("id");
+      if (claimErr) return { status: "error", message: `結單失敗: ${claimErr.message}` };
+      iFilledIt = (won?.length ?? 0) > 0;
+
+      // Only the caller that actually flipped the row drafts the PO. The other
+      // one still succeeded at joining, and says so.
+      if (iFilledIt) {
+        agentDrafted = await draftPurchaseOrder(db, pool as DemandPool, all, priceList);
+      }
     }
 
     revalidatePath("/pools");
@@ -164,11 +207,12 @@ async function draftPurchaseOrder(
   const prices = priceList ? memberPrices(priceList, pool, commitments) : [];
   const tier = prices[0]?.pooledTier ?? status.committedQty;
 
+  const item = asData(pool.item);
   const task = [
-    `${pool.delivery_date} 到貨的 ${pool.item} 併單已經湊滿，草擬一封給供應商的採購單。`,
+    `${pool.delivery_date} 到貨的 ${item} 併單已經湊滿，草擬一封給供應商的採購單。`,
     "",
     "以下數字已經由程式算好，直接引用，不要重算：",
-    `- 品項：${pool.item}`,
+    `- 品項：${item}`,
     `- 總數量：${status.committedQty}（${status.memberCount} 間餐廳合併）`,
     `- 適用級距：${tier} 起`,
     `- 到貨日：${pool.delivery_date}`,

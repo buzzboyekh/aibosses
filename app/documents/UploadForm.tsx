@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { uploadDocument, type UploadResult } from "./actions";
 import type { DocType, ExtractedDoc } from "../../documents/types";
+import { DEMO_KEY_FIELD } from "../demoGuard";
 import * as ui from "../ui";
 
 // The stored doc_type values are unchanged (db/schema.sql's check constraint
@@ -36,7 +37,7 @@ const STAGE_LABEL: Record<string, string> = {
   db: "資料庫寫入",
 };
 
-export default function UploadForm() {
+export default function UploadForm({ demoKey }: { demoKey: string }) {
   const [result, setResult] = useState<UploadResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -56,6 +57,9 @@ export default function UploadForm() {
     }
 
     const formData = new FormData(form);
+    // The action re-checks this itself: gating the page is not enough, because
+    // a server action can be called without ever loading the page.
+    formData.set(DEMO_KEY_FIELD, demoKey);
     startTransition(async () => {
       try {
         const res = await uploadDocument(formData);

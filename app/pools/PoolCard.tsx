@@ -9,7 +9,7 @@ import type { PoolView } from "./actions";
 import JoinForm from "./JoinForm";
 import * as ui from "../ui";
 
-export default function PoolCard({ view }: { view: PoolView }) {
+export default function PoolCard({ view, demoKey }: { view: PoolView; demoKey: string }) {
   const { pool, status, members, targetUnitPrice } = view;
   const pct = Math.min(100, (status.committedQty / status.targetQty) * 100);
   const totalSaving = members.reduce((sum, m) => sum + m.savingTotal, 0);
@@ -96,7 +96,7 @@ export default function PoolCard({ view }: { view: PoolView }) {
         </>
       )}
 
-      {pool.state === "open" && <JoinForm poolId={pool.id} unit="公斤" />}
+      {pool.state === "open" && <JoinForm poolId={pool.id} unit="公斤" demoKey={demoKey} />}
     </div>
   );
 }

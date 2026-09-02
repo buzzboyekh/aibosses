@@ -8,9 +8,12 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { joinPool, type JoinResult } from "./actions";
+import { DEMO_KEY_FIELD } from "../demoGuard";
 import * as ui from "../ui";
 
-export default function JoinForm({ poolId, unit }: { poolId: string; unit: string }) {
+export default function JoinForm(
+  { poolId, unit, demoKey }: { poolId: string; unit: string; demoKey: string }
+) {
   const [result, setResult] = useState<JoinResult | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
@@ -22,6 +25,8 @@ export default function JoinForm({ poolId, unit }: { poolId: string; unit: strin
     const form = e.currentTarget;
     const formData = new FormData(form);
     formData.set("pool_id", poolId);
+    // Re-checked server-side: gating the page does not gate the action.
+    formData.set(DEMO_KEY_FIELD, demoKey);
 
     startTransition(async () => {
       try {

@@ -52,6 +52,25 @@ await api("case_steps?status=in.(pending,running,awaiting_approval,awaiting_repl
   status: "skipped", completed_at: now,
 });
 
+// 2a. Pools, same treatment: closed out, not deleted. A pool left open or
+//     filled from an earlier run stays on /pools, so the second rehearsal put
+//     two grouper cards on screen. `cancelled` drops them from the page while
+//     the row survives. Tolerated if migration 004 has not been applied yet.
+let poolsClosed = 0;
+try {
+  const stale = await (await fetch(
+    `${url}/rest/v1/demand_pools?select=id&state=in.(open,filled)`, { headers: H }
+  )).json();
+  if (Array.isArray(stale) && stale.length) {
+    await api("demand_pools?state=in.(open,filled)", "PATCH", {
+      state: "cancelled", updated_at: now,
+    });
+    poolsClosed = stale.length;
+  }
+} catch {
+  /* table not there yet — nothing to close */
+}
+
 // 2b. Only when explicitly asked: forget what was learned about counterparties.
 let forgotten = 0;
 if (forget) {
@@ -84,4 +103,5 @@ console.log(forget
   ? `demo reset — forgot ${forgotten} learned facts, kept everything else`
   : "demo reset — nothing deleted");
 for (const r of roles) console.log(`  ${r.name}: level ${r.autonomy_level}, ${r.clean_approvals}/${r.promote_threshold}`);
+if (poolsClosed) console.log(`  pools closed out: ${poolsClosed} (re-seed with scripts/seed-pools.mjs)`);
 console.log(`  decision_log intact: ${log.length} rows (view starts after the new marker)`);
