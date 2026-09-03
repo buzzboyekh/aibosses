@@ -15,10 +15,21 @@ import crypto from "node:crypto";
 const AUTO = process.argv.includes("--auto");
 const NO_RESET = process.argv.includes("--no-reset");
 const BASE = process.env.DEPLOY_URL ?? "https://aibosses.vercel.app";
-const { SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: KEY, LINE_CHANNEL_SECRET: SECRET, DASHBOARD_KEY: DKEY } = process.env;
-for (const [k, v] of Object.entries({ SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: KEY, LINE_CHANNEL_SECRET: SECRET, DASHBOARD_KEY: DKEY }))
+const { SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: KEY, LINE_CHANNEL_SECRET: SECRET, DASHBOARD_KEY: DKEY, BUSINESS_KEY: BKEY } = process.env;
+for (const [k, v] of Object.entries({ SUPABASE_URL: URL_, SUPABASE_SERVICE_ROLE_KEY: KEY, LINE_CHANNEL_SECRET: SECRET, DASHBOARD_KEY: DKEY, BUSINESS_KEY: BKEY }))
   if (!v) throw new Error(`${k} missing from .env.local`);
 const H = { apikey: KEY, Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" };
+
+// Every read below has to be scoped to one business. The database holds three
+// demos, and unscoped this script reads across all of them: the closing audit
+// trail printed tyre sizes in the middle of a food demo, and — worse, because
+// it is silent — approvePending() approved whatever card was newest anywhere,
+// which is not the same thing as the card we just drafted. No default here on
+// purpose: a default that disagrees with the one the pages use is how /pools
+// came up empty in rehearsal.
+const bizRows = await (await fetch(`${URL_}/rest/v1/businesses?select=id&key=eq.${encodeURIComponent(BKEY)}`, { headers: H })).json();
+if (!bizRows?.length) throw new Error(`BUSINESS_KEY=${BKEY} matches no row — seed it before demoing`);
+const BIZ = `business_id=eq.${bizRows[0].id}`;
 
 const rl = AUTO ? null : createInterface({ input: stdin, output: stdout });
 const dim = (s) => `\x1b[2m${s}\x1b[0m`;
@@ -54,7 +65,7 @@ async function waitForDraft(sinceIso, label) {
     await sleep(1500);
     const secs = Math.round((Date.now() - started) / 1000);
     process.stdout.write(`\r   ${dim(`agent working… ${secs}s`)}   `);
-    const rows = await (await fetch(`${URL_}/rest/v1/approvals?select=title,payload,created_at&created_at=gt.${sinceIso}&order=created_at.desc&limit=1`, { headers: H })).json();
+    const rows = await (await fetch(`${URL_}/rest/v1/approvals?select=title,payload,created_at&${BIZ}&created_at=gt.${sinceIso}&order=created_at.desc&limit=1`, { headers: H })).json();
     if (rows.length) {
       process.stdout.write("\r" + " ".repeat(40) + "\r");
       console.log(cyan(`   ${label}: ${rows[0].title}`));
@@ -71,7 +82,7 @@ const now = () => new Date().toISOString();
 /** Approve whatever is pending, exactly as tapping the card does. */
 async function approvePending() {
   const rows = await (await fetch(
-    `${URL_}/rest/v1/approvals?select=id&state=eq.pending_approval&order=created_at.desc&limit=1`,
+    `${URL_}/rest/v1/approvals?select=id&${BIZ}&state=eq.pending_approval&order=created_at.desc&limit=1`,
     { headers: H }
   )).json();
   if (!rows.length) { console.log(dim("   nothing pending to approve")); return false; }
@@ -140,7 +151,13 @@ await beat(
 await waitForDraft(t, "drafted unprompted");
 
 // ---- Close: the audit trail -------------------------------------------------
-const log = await (await fetch(`${URL_}/rest/v1/decision_log?select=actor,action,reason&order=id.asc`, { headers: H })).json();
+const allLog = await (await fetch(`${URL_}/rest/v1/decision_log?select=actor,action,reason&${BIZ}&order=id.asc`, { headers: H })).json();
+// The log is append-only, so every rehearsal stays in it forever. That is the
+// point, but it is not what the closing beat is for — start from the last
+// reset marker, which exists to say exactly this. Nothing is deleted; the rest
+// is still on the dashboard.
+const lastReset = allLog.map((e) => e.action).lastIndexOf("session_reset");
+const log = allLog.slice(lastReset + 1);
 console.log(bold("\nSAY: ") + "Every one of those is on the record: who did it, and why.");
 console.log();
 for (const e of log) console.log("   " + e.actor.padEnd(24) + e.action.padEnd(11) + dim((e.reason ?? "").slice(0, 60)));
